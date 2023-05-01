@@ -60,6 +60,7 @@ if ( CLIENT ) then
     local SortedPairsByMemberValue = SortedPairsByMemberValue
     local Lerp = Lerp
     local RealTime = RealTime
+    local pairs = pairs
     local ScrW = ScrW
     local ScrH = ScrH
     local Start3D2D = cam.Start3D2D
@@ -191,10 +192,6 @@ if ( CLIENT ) then
 
             local removeEnt = ent:GetRemoveEntity()
             if !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or removeEnt != ent and !IsValid( removeEnt ) then
-                net.Start( "npcsqueakers_removeent" )
-                    net.WriteEntity( ent )
-                net.SendToServer()
-
                 if IsValid( snd ) then snd:Stop() end
                 table_remove( NPCVC_SoundEmitters, index )
                 continue
