@@ -365,6 +365,7 @@ if ( SERVER ) then
     local table_RemoveByValue = table.RemoveByValue
     local FindInSphere = ents.FindInSphere
     local IsSinglePlayer = game.SinglePlayer
+    local StoreEntityModifier = duplicator.StoreEntityModifier
 
     local nextNPCSoundThink = 0
     local noWepFearNPCs = {
@@ -605,7 +606,7 @@ if ( SERVER ) then
                 end
                 npc.l_NPCVC_ProfilePicture = profilePic
 
-                duplicator.StoreEntityModifier( npc, "Lambda NPC VoiceChat - NPC's Voice Data", {
+                StoreEntityModifier( npc, "Lambda NPC VoiceChat - NPC's Voice Data", {
                     SpeechChance = speechChance,
                     VoicePitch = voicePitch,
                     NickName = openName,
@@ -641,7 +642,7 @@ if ( SERVER ) then
                 if voicePfp and voicePfp != "" then
                     npc.l_NPCVC_VoiceProfile = voicePfp
 
-                    duplicator.StoreEntityModifier( npc, "Lambda NPC VoiceChat - NPC's Voice Data", {
+                    StoreEntityModifier( npc, "Lambda NPC VoiceChat - NPC's Voice Data", {
                         SpeechChance = npc.l_NPCVC_SpeechChance,
                         VoicePitch = npc.l_NPCVC_VoicePitch,
                         NickName = npc.l_NPCVC_Nickname,
