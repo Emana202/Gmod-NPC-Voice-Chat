@@ -330,16 +330,22 @@ local function AddToolMenuTabs()
     spawnmenu.AddToolCategory( "Utilities", "YerSoMashy", "YerSoMashy" )
 end
 
+local clientColor = Color( 255, 145, 0 )
+local function ClientControlHelp( panel, text )
+    local help = panel:ControlHelp( text )
+    help:SetTextColor( clientColor )
+end
+
 local function PopulateToolMenu()
     spawnmenu.AddToolMenuOption( "Utilities", "YerSoMashy", "NPCSqueakersMenu", "NPC Voice Chat", "", "", function( panel ) 
         local clText = panel:Help( "Client-Side (User Settings):" )
-        clText:SetTextColor( Color( 255, 145, 0 ) )
+        clText:SetTextColor( clientColor )
 
         panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 1 )
-        panel:ControlHelp( "Volume of NPCs' voices during their voicechat shenanigans" )
+        ClientControlHelp( panel, "Volume of NPCs' voices during their voicechat shenanigans" )
 
         panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
-        panel:ControlHelp( "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
+        ClientControlHelp( panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
 
         local clVoicePfps
         if NPCVC_LambdaVoiceProfile then
@@ -351,23 +357,23 @@ local function PopulateToolMenu()
                 clVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
 
-            panel:ControlHelp( "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
+            ClientControlHelp( panel, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
         end
 
         panel:CheckBox( "Global Voice Chat", "cl_npcvoicechat_globalvoicechat" )
-        panel:ControlHelp( "If the NPC voices can be heard globally" )
+        ClientControlHelp( panel, "If NPC's voice chat can be heard globally and not in 3D" )
 
         panel:CheckBox( "Display Voice Icon", "cl_npcvoicechat_showvoiceicon" )
-        panel:ControlHelp( "If a voice icon should appear above NPC while they're using voicechat" )
+        ClientControlHelp( panel, "If a voice icon should appear above NPC while they're speaking or using voicechat" )
 
         panel:CheckBox( "Display Voice Popups", "cl_npcvoicechat_showpopups" )
-        panel:ControlHelp( "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
+        ClientControlHelp( panel, "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
 
         panel:NumSlider( "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", 0, 2000, 0 )
-        panel:ControlHelp( "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
+        ClientControlHelp( panel, "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
 
         panel:NumSlider( "Popup Fadeout Time", "cl_npcvoicechat_popupfadetime", 0, 10, 1 )
-        panel:ControlHelp( "Time in seconds required for a voice popup to fully fadeout after not being used" )
+        ClientControlHelp( panel, "Time in seconds required for a voice popup to fully fadeout after not being used" )
 
         panel:Help( "Popup Volume Color:" )
         local popupColor = vgui.Create( "DColorMixer", panel )
@@ -377,7 +383,12 @@ local function PopulateToolMenu()
         popupColor:SetConVarG( "cl_npcvoicechat_popupcolor_g" )
         popupColor:SetConVarB( "cl_npcvoicechat_popupcolor_b" )
 
-        panel:ControlHelp( "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
+        ClientControlHelp( panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
+
+        if !LocalPlayer():IsSuperAdmin() then 
+            panel:Help( "" )
+            return 
+        end
 
         panel:Help( "------------------------------------------------------------" )
         local svText = panel:Help( "Server-Side (Admin Settings):" )
@@ -402,16 +413,24 @@ local function PopulateToolMenu()
         panel:CheckBox( "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps" )
         panel:ControlHelp( "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
 
-        panel:NumSlider( "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", 10, 100, 0 )
+        local minPitch = panel:NumSlider( "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", 10, 100, 0 )
         panel:ControlHelp( "The lowest pitch a NPC's voice can get upon spawning" )
        
-        panel:NumSlider( "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", 100, 255, 0 )
+        local maxPitch = panel:NumSlider( "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", 100, 255, 0 )
         panel:ControlHelp( "The highest pitch a NPC's voice can get upon spawning" )
 
-        local svVoicePfps
+        function minPitch:OnValueChanged( value )
+            maxPitch:SetMin( value )
+        end
+        function maxPitch:OnValueChanged( value )
+            minPitch:SetMax( value )
+        end
+
         if NPCVC_LambdaVoiceProfile then
             panel:Help( "Lambda-Related Stuff:" )
+        end
 
+        if LambdaVoiceProfiles then
             panel:CheckBox( "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines" )
             panel:ControlHelp( "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 
@@ -420,7 +439,10 @@ local function PopulateToolMenu()
             
             panel:CheckBox( "Use Lambda Players Nicknames", "sv_npcvoicechat_uselambdanames" )
             panel:ControlHelp( "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
+        end
 
+        local svVoicePfps
+        if NPCVC_LambdaVoiceProfile then
             svVoicePfps = panel:ComboBox( "Lambda Voice Profile", "sv_npcvoicechat_lambdavoicepfp" )
             svVoicePfps:SetSortItems( false )
             svVoicePfps:AddChoice( "None", "" )
@@ -428,7 +450,6 @@ local function PopulateToolMenu()
             for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
                 svVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
-
             panel:ControlHelp( "The Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
             panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_lambdavoicepfp_spawnchance", 0, 100, 0 )
