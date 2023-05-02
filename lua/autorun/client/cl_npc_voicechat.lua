@@ -48,8 +48,9 @@ local vcPopupColorB     = CreateClientConVar( "cl_npcvoicechat_popupcolor_b", "0
 
 CreateClientConVar( "cl_npcvoicechat_lambdavoicepfp", "", nil, true, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
-NPCVC_SoundEmitters     = {}
-NPCVC_VoicePopups       = {}
+NPCVC_SoundEmitters         = {}
+NPCVC_VoicePopups           = {}
+NPCVC_LambdaVoiceProfile    = {}
 
 local function PlaySoundFile( sndDir, vcData, is3D )
     local ent = vcData.Emitter
@@ -126,6 +127,10 @@ end
 
 net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), true )
+end )
+
+net.Receive( "npcsqueakers_updatelambdavoicepfps", function()
+    NPCVC_LambdaVoiceProfile = net.ReadTable()
 end )
 
 local function UpdateSounds()
@@ -327,7 +332,7 @@ end
 
 local function PopulateToolMenu()
     spawnmenu.AddToolMenuOption( "Utilities", "YerSoMashy", "NPCSqueakersMenu", "NPC Voice Chat", "", "", function( panel ) 
-        local clText = panel:Help( "Client-Side:" )
+        local clText = panel:Help( "Client-Side (User Settings):" )
         clText:SetTextColor( Color( 255, 145, 0 ) )
 
         panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 1 )
@@ -337,12 +342,12 @@ local function PopulateToolMenu()
         panel:ControlHelp( "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
 
         local clVoicePfps
-        if LambdaVoiceProfiles then
+        if NPCVC_LambdaVoiceProfile then
             clVoicePfps = panel:ComboBox( "Lambda Voice Profile", "cl_npcvoicechat_lambdavoicepfp" )
             clVoicePfps:SetSortItems( false )
             clVoicePfps:AddChoice( "None", "" )
 
-            for lambdaVP, _ in SortedPairs( LambdaVoiceProfiles ) do
+            for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
                 clVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
 
@@ -375,7 +380,7 @@ local function PopulateToolMenu()
         panel:ControlHelp( "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
 
         panel:Help( "------------------------------------------------------------" )
-        local svText = panel:Help( "Server-Side:" )
+        local svText = panel:Help( "Server-Side (Admin Settings):" )
         svText:SetTextColor( Color( 0, 174, 255 ) )
 
         panel:CheckBox( "Enable NPC Voice Chat", "sv_npcvoicechat_enabled" )
@@ -404,7 +409,7 @@ local function PopulateToolMenu()
         panel:ControlHelp( "The highest pitch a NPC's voice can get upon spawning" )
 
         local svVoicePfps
-        if LambdaVoiceProfiles then
+        if NPCVC_LambdaVoiceProfile then
             panel:Help( "Lambda-Related Stuff:" )
 
             panel:CheckBox( "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines" )
@@ -420,7 +425,7 @@ local function PopulateToolMenu()
             svVoicePfps:SetSortItems( false )
             svVoicePfps:AddChoice( "None", "" )
 
-            for lambdaVP, _ in SortedPairs( LambdaVoiceProfiles ) do
+            for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
                 svVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
 
@@ -431,20 +436,20 @@ local function PopulateToolMenu()
         end
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
-            if clVoicePfps then
+            if IsValid( clVoicePfps ) then
                 clVoicePfps:Clear()
                 clVoicePfps:AddChoice( "None", "" )
 
-                for lambdaVP, _ in SortedPairs( LambdaVoiceProfiles ) do
+                for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
                     clVoicePfps:AddChoice( lambdaVP, lambdaVP )
                 end
             end
 
-            if svVoicePfps then
+            if IsValid( svVoicePfps ) then
                 svVoicePfps:Clear()
                 svVoicePfps:AddChoice( "None", "" )
 
-                for lambdaVP, _ in SortedPairs( LambdaVoiceProfiles ) do
+                for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
                     svVoicePfps:AddChoice( lambdaVP, lambdaVP )
                 end
             end

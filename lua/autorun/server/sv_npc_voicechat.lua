@@ -14,6 +14,7 @@ local ents_GetAll = ents.GetAll
 local CurTime = CurTime
 local ents_Create = ents.Create
 local table_GetKeys = table.GetKeys
+local table_insert = table.insert
 local table_Copy = table.Copy
 local table_RemoveByValue = table.RemoveByValue
 local FindInSphere = ents.FindInSphere
@@ -56,10 +57,12 @@ local defaultNames = { "Based Kleiner", "The Real Zeta Player", "Beta", "Generic
 NPCVC_NickNames = NPCVC_NickNames or {}
 NPCVC_VoiceLines = NPCVC_VoiceLines or {}
 NPCVC_ProfilePictures = NPCVC_ProfilePictures or {}
+NPCVC_LambdaVoiceProfile = NPCVC_LambdaVoiceProfile or {}
 
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
+util.AddNetworkString( "npcsqueakers_updatelambdavoicepfps" )
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
@@ -105,6 +108,31 @@ local function UpdateData( ply )
     for _, pfpPic in ipairs( pfpPics ) do
         NPCVC_ProfilePictures[ #NPCVC_ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
     end
+
+    if LambdaVoiceProfiles then
+        NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
+    else
+        table_Empty( NPCVC_LambdaVoiceProfile )
+        
+        local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+        for _, voicePfp in ipairs( lambdaVPs ) do
+            NPCVC_LambdaVoiceProfile[ voicePfp ] = {}
+
+            for voiceType, _ in pairs( voicelineDirs ) do 
+                local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
+                if !voicelines or #voicelines == 0 then continue end
+
+                NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ] = {}
+                for _, voiceline in ipairs( voicelines ) do
+                    table_insert( NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
+                end
+            end
+        end
+    end
+
+    net.Start( "npcsqueakers_updatelambdavoicepfps" )
+        net.WriteTable( NPCVC_LambdaVoiceProfile )
+    net.Broadcast()
 
     net.Start( "npcsqueakers_updatespawnmenu" )
     net.Broadcast()
@@ -157,7 +185,9 @@ function nextbotMETA:BecomeRagdoll( dmginfo )
 end
 
 local function GetVoiceLine( ent, voiceType )
-    local voicePfp = ( LambdaVoiceProfiles and LambdaVoiceProfiles[ ent.NPCVC_VoiceProfile ] )
+    local hasPfps = ( #NPCVC_LambdaVoiceProfile != 0 )
+
+    local voicePfp = ( hasPfps and NPCVC_LambdaVoiceProfile[ ent.NPCVC_VoiceProfile ] )
     if voicePfp then
         local voiceTbl = voicePfp[ voiceType ]
         if voiceTbl and #voiceTbl != 0 then
@@ -165,7 +195,7 @@ local function GetVoiceLine( ent, voiceType )
         end
     end
 
-    local voicelineTbl = ( ( LambdaVoiceProfiles and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceProfiles or NPCVC_VoiceLines ) 
+    local voicelineTbl = ( ( hasPfps and vcUseLambdaVoicelines:GetBool() ) and NPCVC_LambdaVoiceProfile or NPCVC_VoiceLines ) 
     local voiceTbl = voicelineTbl[ voiceType ]
     return voiceTbl[ random( #voiceTbl ) ]
 end
@@ -326,11 +356,11 @@ local function OnEntityCreated( npc )
             npc.NPCVC_PfpBackgroundColor = pfpBgClr
 
             local voicePfp
-            if LambdaVoiceProfiles then
+            if #NPCVC_LambdaVoiceProfile != 0 then
                 voicePfp = vcLambdaVoicePfp:GetString()
                 if #voicePfp == 0 then 
                     if random( 1, 100 ) <= vcLambdaVoicePfpChance:GetInt() then
-                        local voicePfps = table_GetKeys( LambdaVoiceProfiles ) 
+                        local voicePfps = table_GetKeys( NPCVC_LambdaVoiceProfile ) 
                         voicePfp = voicePfps[ random( #voicePfps ) ]
                     else
                         voicePfp = nil
