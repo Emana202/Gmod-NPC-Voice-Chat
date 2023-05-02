@@ -351,19 +351,14 @@ local function OnEntityCreated( npc )
             npc.NPCVC_ProfilePicture = profilePic
             npc.NPCVC_PfpBackgroundColor = pfpBgClr
 
-            local voicePfp
-            if #NPCVC_LambdaVoiceProfile != 0 then
-                voicePfp = vcLambdaVoicePfp:GetString()
-                if #voicePfp == 0 then 
-                    if random( 1, 100 ) <= vcLambdaVoicePfpChance:GetInt() then
-                        local voicePfps = table_GetKeys( NPCVC_LambdaVoiceProfile ) 
-                        voicePfp = voicePfps[ random( #voicePfps ) ]
-                    else
-                        voicePfp = nil
-                    end
-                else
-                    npc.NPCVC_IsVoiceProfileServerside = true
-                end
+            local cvarVoice = vcLambdaVoicePfp:GetString()
+            local voicePfp = NPCVC_LambdaVoiceProfile[ cvarVoice ]
+            if !voicePfp and random( 1, 100 ) <= vcLambdaVoicePfpChance:GetInt() then
+                local voicePfps = table_GetKeys( NPCVC_LambdaVoiceProfile ) 
+                voicePfp = voicePfps[ random( #voicePfps ) ]
+            else
+                voicePfp = cvarVoice
+                npc.NPCVC_IsVoiceProfileServerside = true
             end
             npc.NPCVC_VoiceProfile = voicePfp
 
