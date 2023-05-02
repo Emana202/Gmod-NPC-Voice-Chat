@@ -15,6 +15,7 @@ local cam = cam
 local surface = surface
 local table_remove = table.remove
 local max = math.max
+local GetConVar = GetConVar
 local RoundedBox = draw.RoundedBox
 local DrawText = draw.DrawText
 local SortedPairsByMemberValue = SortedPairsByMemberValue
@@ -51,6 +52,31 @@ CreateClientConVar( "cl_npcvoicechat_lambdavoicepfp", "", nil, true, "The Lambda
 NPCVC_SoundEmitters         = {}
 NPCVC_VoicePopups           = {}
 NPCVC_LambdaVoiceProfile    = {}
+
+local function UpdateVoiceProfiles()
+    if LambdaVoiceProfiles then
+        NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
+        return
+    end
+
+    table_Empty( NPCVC_LambdaVoiceProfile )
+    local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+    
+    for _, voicePfp in ipairs( lambdaVPs ) do
+        NPCVC_LambdaVoiceProfile[ voicePfp ] = {}
+
+        for voiceType, _ in pairs( voicelineDirs ) do 
+            local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
+            if !voicelines or #voicelines == 0 then continue end
+
+            NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ] = {}
+            for _, voiceline in ipairs( voicelines ) do
+                table_insert( NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
+            end
+        end
+    end
+end
+SimpleTimer( 0, UpdateVoiceProfiles )
 
 local function PlaySoundFile( sndDir, vcData, is3D )
     local ent = vcData.Emitter
@@ -127,10 +153,6 @@ end
 
 net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), true )
-end )
-
-net.Receive( "npcsqueakers_updatelambdavoicepfps", function()
-    NPCVC_LambdaVoiceProfile = net.ReadTable()
 end )
 
 local function UpdateSounds()
@@ -353,9 +375,13 @@ local function PopulateToolMenu()
             clVoicePfps:SetSortItems( false )
             clVoicePfps:AddChoice( "None", "" )
 
+            local curValue
+            local curVoicePfp = GetConVar( "cl_npcvoicechat_lambdavoicepfp" ):GetString()
             for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
+                if curVoicePfp == lambdaVP then curValue = lambdaVP end
                 clVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
+            clVoicePfps:SetValue( curValue or "None" )
 
             ClientControlHelp( panel, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
         end
@@ -447,9 +473,14 @@ local function PopulateToolMenu()
             svVoicePfps:SetSortItems( false )
             svVoicePfps:AddChoice( "None", "" )
 
+            local curValue
+            local curVoicePfp = GetConVar( "sv_npcvoicechat_lambdavoicepfp" ):GetString()
             for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
+                if curVoicePfp == lambdaVP then curValue = lambdaVP end
                 svVoicePfps:AddChoice( lambdaVP, lambdaVP )
             end
+            svVoicePfps:SetValue( curValue or "None" )
+
             panel:ControlHelp( "The Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
             panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_lambdavoicepfp_spawnchance", 0, 100, 0 )
@@ -457,22 +488,32 @@ local function PopulateToolMenu()
         end
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
+            UpdateVoiceProfiles()
+
             if IsValid( clVoicePfps ) then
                 clVoicePfps:Clear()
                 clVoicePfps:AddChoice( "None", "" )
 
+                local curValue
+                local curVoicePfp = GetConVar( "cl_npcvoicechat_lambdavoicepfp" ):GetString()
                 for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
+                    if curVoicePfp == lambdaVP then curValue = lambdaVP end
                     clVoicePfps:AddChoice( lambdaVP, lambdaVP )
                 end
+                clVoicePfps:SetValue( curValue or "None" )
             end
 
             if IsValid( svVoicePfps ) then
                 svVoicePfps:Clear()
                 svVoicePfps:AddChoice( "None", "" )
 
+                local curValue
+                local curVoicePfp = GetConVar( "sv_npcvoicechat_lambdavoicepfp" ):GetString()
                 for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
+                    if curVoicePfp == lambdaVP then curValue = lambdaVP end
                     svVoicePfps:AddChoice( lambdaVP, lambdaVP )
                 end
+                svVoicePfps:SetValue( curValue or "None" )
             end
         end )
 

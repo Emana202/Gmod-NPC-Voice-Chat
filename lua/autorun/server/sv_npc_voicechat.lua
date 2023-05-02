@@ -62,7 +62,6 @@ NPCVC_LambdaVoiceProfile = NPCVC_LambdaVoiceProfile or {}
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
-util.AddNetworkString( "npcsqueakers_updatelambdavoicepfps" )
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
@@ -109,12 +108,15 @@ local function UpdateData( ply )
         NPCVC_ProfilePictures[ #NPCVC_ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
     end
 
-    if LambdaVoiceProfiles then
-        NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
-    else
+    SimpleTimer( 0, function()
+        if LambdaVoiceProfiles then
+            NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
+            return
+        end
+
         table_Empty( NPCVC_LambdaVoiceProfile )
-        
         local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+
         for _, voicePfp in ipairs( lambdaVPs ) do
             NPCVC_LambdaVoiceProfile[ voicePfp ] = {}
 
@@ -128,11 +130,7 @@ local function UpdateData( ply )
                 end
             end
         end
-    end
-
-    net.Start( "npcsqueakers_updatelambdavoicepfps" )
-        net.WriteTable( NPCVC_LambdaVoiceProfile )
-    net.Broadcast()
+    end )
 
     net.Start( "npcsqueakers_updatespawnmenu" )
     net.Broadcast()
@@ -185,9 +183,7 @@ function nextbotMETA:BecomeRagdoll( dmginfo )
 end
 
 local function GetVoiceLine( ent, voiceType )
-    local hasPfps = ( #NPCVC_LambdaVoiceProfile != 0 )
-
-    local voicePfp = ( hasPfps and NPCVC_LambdaVoiceProfile[ ent.NPCVC_VoiceProfile ] )
+    local voicePfp = NPCVC_LambdaVoiceProfile[ ent.NPCVC_VoiceProfile ]
     if voicePfp then
         local voiceTbl = voicePfp[ voiceType ]
         if voiceTbl and #voiceTbl != 0 then
@@ -195,7 +191,7 @@ local function GetVoiceLine( ent, voiceType )
         end
     end
 
-    local voicelineTbl = ( ( hasPfps and vcUseLambdaVoicelines:GetBool() ) and NPCVC_LambdaVoiceProfile or NPCVC_VoiceLines ) 
+    local voicelineTbl = ( ( #NPCVC_LambdaVoiceProfile != 0 and vcUseLambdaVoicelines:GetBool() ) and NPCVC_LambdaVoiceProfile or NPCVC_VoiceLines ) 
     local voiceTbl = voicelineTbl[ voiceType ]
     return voiceTbl[ random( #voiceTbl ) ]
 end
