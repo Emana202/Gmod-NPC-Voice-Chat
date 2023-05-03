@@ -551,11 +551,12 @@ local function OnServerThink()
                             end
                         end
                     else
+                        local curState = npc:GetNPCState()
+
                         if curTime >= npc.NPCVC_NextDangerSoundTime and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) or npc:HasCondition( 58 ) ) and vcAllowLines_SpotDanger:GetBool() then
                             PlaySoundFile( npc, "panic" )
                             npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
                         else
-                            local curState = npc:GetNPCState()
                             if rolledSpeech then
                                 if !isPanicking then
                                     isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npc:GetClass() ] and !IsValid( npc:GetActiveWeapon() ) or npc:Disposition( curEnemy ) == D_FR ) )
