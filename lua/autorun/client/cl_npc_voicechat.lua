@@ -36,7 +36,7 @@ local voiceIconMat      = Material( "voice/icntlk_pl" )
 local popup_BaseClr     = Color( 255, 255, 255, 255 )
 local popup_BoxClr      = Color( 0, 255, 0, 240 )
 
-local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using Lambda Players' voicelines", 0, 1 )
+local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcGlobalVC        = CreateClientConVar( "cl_npcvoicechat_globalvoicechat", "0", nil, nil, "If the NPC voices can be heard globally", 0, 1 )
 local vcPlayVol         = CreateClientConVar( "cl_npcvoicechat_playvolume", "1", nil, nil, "The sound volume of NPC voices", 0 )
 local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "300", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
@@ -49,31 +49,32 @@ local vcPopupColorR     = CreateClientConVar( "cl_npcvoicechat_popupcolor_r", "0
 local vcPopupColorG     = CreateClientConVar( "cl_npcvoicechat_popupcolor_g", "255", nil, nil, "The green color of voice popup when the NPC is using it", 0, 255 )
 local vcPopupColorB     = CreateClientConVar( "cl_npcvoicechat_popupcolor_b", "0", nil, nil, "The blue color of voice popup when the NPC is using it", 0, 255 )
 
-CreateClientConVar( "cl_npcvoicechat_lambdavoicepfp", "", nil, true, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
+CreateClientConVar( "cl_npcvoicechat_spawnvoiceprofile", "", nil, true, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
 NPCVC_SoundEmitters         = {}
 NPCVC_VoicePopups           = {}
-NPCVC_LambdaVoiceProfile    = {}
+NPCVC_VoiceProfiles         = {}
 
 local function UpdateVoiceProfiles()
-    if LambdaVoiceProfiles then
-        NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
-        return
+    table_Empty( NPCVC_VoiceProfiles )
+
+    local _, voicePfpDirs = file_Find( "sound/npcvoicechat/voiceprofiles/*", "GAME" )
+    if voicePfpDirs then
+        for _, voicePfp in ipairs( voicePfpDirs ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = false
+            profileCount = ( profileCount + 1 )
+        end
     end
 
-    table_Empty( NPCVC_LambdaVoiceProfile )
-    local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
-    
-    for _, voicePfp in ipairs( lambdaVPs ) do
-        NPCVC_LambdaVoiceProfile[ voicePfp ] = {}
-
-        for voiceType, _ in pairs( voicelineDirs ) do 
-            local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
-            if !voicelines or #voicelines == 0 then continue end
-
-            NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ] = {}
-            for _, voiceline in ipairs( voicelines ) do
-                table_insert( NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
+    if LambdaVoiceProfiles then
+        for voicePfp, _ in pairs( LambdaVoiceProfiles ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = true
+        end
+    else
+        local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+        if lambdaVPs then
+            for _, voicePfp in ipairs( lambdaVPs ) do
+                NPCVC_VoiceProfiles[ voicePfp ] = true
             end
         end
     end
@@ -367,22 +368,17 @@ local function PopulateToolMenu()
         panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
         ColoredControlHelp( true, panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
 
-        local clVoicePfps
-        if NPCVC_LambdaVoiceProfile then
-            clVoicePfps = panel:ComboBox( "Lambda Voice Profile", "cl_npcvoicechat_lambdavoicepfp" )
-            clVoicePfps:SetSortItems( false )
-            clVoicePfps:AddChoice( "None", "" )
-
-            local curValue
-            local curVoicePfp = GetConVar( "cl_npcvoicechat_lambdavoicepfp" ):GetString()
-            for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
-                if curVoicePfp == lambdaVP then curValue = lambdaVP end
-                clVoicePfps:AddChoice( lambdaVP, lambdaVP )
-            end
-            clVoicePfps:SetValue( curValue or "None" )
-
-            ColoredControlHelp( true, panel, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
+        local clVoicePfps = panel:ComboBox( "Voice Profile", "cl_npcvoicechat_spawnvoiceprofile" )
+        clVoicePfps:SetSortItems( false )
+        clVoicePfps:AddChoice( "None", "" )
+        local curValue
+        local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
+        for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+            if curVoicePfp == voiceProfile then curValue = voiceProfile end
+            clVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
         end
+        clVoicePfps:SetValue( curValue or "None" )
+        ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
         panel:CheckBox( "Global Voice Chat", "cl_npcvoicechat_globalvoicechat" )
         ColoredControlHelp( true, panel, "If NPC's voice chat can be heard globally and not in 3D" )
@@ -450,11 +446,9 @@ local function PopulateToolMenu()
             minPitch:SetMax( value )
         end
 
-        if NPCVC_LambdaVoiceProfile then
-            panel:Help( "Lambda-Related Stuff:" )
-        end
-
         if LambdaVoiceProfiles then
+            panel:Help( "Lambda-Related Stuff:" )
+
             panel:CheckBox( "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines" )
             ColoredControlHelp( false, panel, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 
@@ -465,25 +459,20 @@ local function PopulateToolMenu()
             ColoredControlHelp( false, panel, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
         end
 
-        local svVoicePfps
-        if NPCVC_LambdaVoiceProfile then
-            svVoicePfps = panel:ComboBox( "Lambda Voice Profile", "sv_npcvoicechat_lambdavoicepfp" )
-            svVoicePfps:SetSortItems( false )
-            svVoicePfps:AddChoice( "None", "" )
-
-            local curValue
-            local curVoicePfp = GetConVar( "sv_npcvoicechat_lambdavoicepfp" ):GetString()
-            for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
-                if curVoicePfp == lambdaVP then curValue = lambdaVP end
-                svVoicePfps:AddChoice( lambdaVP, lambdaVP )
-            end
-            svVoicePfps:SetValue( curValue or "None" )
-
-            ColoredControlHelp( false, panel, "The Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
-
-            panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_lambdavoicepfp_spawnchance", 0, 100, 0 )
-            ColoredControlHelp( false, panel, "The chance the a NPC will use a random available Lambda Voice Profile as their voice profile after they spawn" )
+        local svVoicePfps = panel:ComboBox( "Voice Profile", "sv_npcvoicechat_spawnvoiceprofile" )
+        svVoicePfps:SetSortItems( false )
+        svVoicePfps:AddChoice( "None", "" )
+        local curValue
+        local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
+        for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+            if curVoicePfp == voiceProfile then curValue = voiceProfile end
+            svVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
         end
+        svVoicePfps:SetValue( curValue or "None" )
+        ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
+
+        panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", 0, 100, 0 )
+        ColoredControlHelp( false, panel, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
             UpdateVoiceProfiles()
@@ -491,12 +480,11 @@ local function PopulateToolMenu()
             if IsValid( clVoicePfps ) then
                 clVoicePfps:Clear()
                 clVoicePfps:AddChoice( "None", "" )
-
                 local curValue
-                local curVoicePfp = GetConVar( "cl_npcvoicechat_lambdavoicepfp" ):GetString()
-                for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
-                    if curVoicePfp == lambdaVP then curValue = lambdaVP end
-                    clVoicePfps:AddChoice( lambdaVP, lambdaVP )
+                local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
+                for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+                    if curVoicePfp == voiceProfile then curValue = voiceProfile end
+                    clVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
                 end
                 clVoicePfps:SetValue( curValue or "None" )
             end
@@ -504,12 +492,11 @@ local function PopulateToolMenu()
             if IsValid( svVoicePfps ) then
                 svVoicePfps:Clear()
                 svVoicePfps:AddChoice( "None", "" )
-
                 local curValue
-                local curVoicePfp = GetConVar( "sv_npcvoicechat_lambdavoicepfp" ):GetString()
-                for lambdaVP, _ in SortedPairs( NPCVC_LambdaVoiceProfile ) do
-                    if curVoicePfp == lambdaVP then curValue = lambdaVP end
-                    svVoicePfps:AddChoice( lambdaVP, lambdaVP )
+                local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
+                for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+                    if curVoicePfp == voiceProfile then curValue = voiceProfile end
+                    svVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
                 end
                 svVoicePfps:SetValue( curValue or "None" )
             end
@@ -518,6 +505,19 @@ local function PopulateToolMenu()
         panel:Help( "------------------------------------------------------------" )
         panel:Button( "Update Data", "sv_npcvoicechat_updatedata" )
         ColoredControlHelp( false, panel, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting. You should always do it after adding or removing stuff" )
+        panel:Help( "------------------------------------------------------------" )
+
+        panel:Help( "You can add new voicelines, nicknames, profile pictures and etc. by doing following the steps below:" )
+        panel:Help( "Voicelines:" )
+        ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/vo'.\nIn that directory create a folder with the name of your sound's voiceline type and put the soundfile there. The filename doesn't matter, but the sound must be in .wav, .mp3, or .ogg format, have a frequency of 44100Hz, and have only one mono channel.\nThere are currently 8 types of sounds: assist, death, witness, idle, taunt, panic, laugh, and kill" )
+        panel:Help( "Voice Profiles:" )
+        ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/voiceprofiles'.\nIn that directory you create a folder with the name of voice profile. After that the steps are the same from the voicelines one" )
+        panel:Help( "Nicknames:" )
+        ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/data/npcvoicechat'. There, you need the 'names.json' file.\nOpen it with you text editor and add or remove as many names as you like to. Just remember to follow the JSON file's formatting" )
+        panel:Help( "Profile Pictures:" )
+        ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/materials/npcvcdata/profilepics'.\nPut your profile picture images there, but make sure that its format is either .jpg or .png" )
+
+        panel:Help( "------------------------------------------------------------" )
 
         panel:Help( "Voiceline Type Toggles:" )
         panel:CheckBox( "Idling", "sv_npcvoicechat_allowlines_idle" )

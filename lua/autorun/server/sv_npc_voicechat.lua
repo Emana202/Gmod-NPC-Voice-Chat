@@ -57,7 +57,7 @@ local defaultNames = { "Based Kleiner", "The Real Zeta Player", "Beta", "Generic
 NPCVC_NickNames = NPCVC_NickNames or {}
 NPCVC_VoiceLines = NPCVC_VoiceLines or {}
 NPCVC_ProfilePictures = NPCVC_ProfilePictures or {}
-NPCVC_LambdaVoiceProfile = NPCVC_LambdaVoiceProfile or {}
+NPCVC_VoiceProfiles = NPCVC_VoiceProfiles or {}
 
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
@@ -108,24 +108,57 @@ local function UpdateData( ply )
         NPCVC_ProfilePictures[ #NPCVC_ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
     end
 
+    table_Empty( NPCVC_VoiceProfiles )
+    
+    local _, voicePfpDirs = file_Find( "sound/npcvoicechat/voiceprofiles/*", "GAME" )
+    if voicePfpDirs then
+        for _, voicePfp in ipairs( voicePfpDirs ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = {}
+
+            for voiceType, _ in pairs( voicelineDirs ) do 
+                local voicelines = file_Find( "sound/npcvoicechat/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
+                if !voicelines or #voicelines == 0 then continue end
+
+                NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
+                for _, voiceline in ipairs( voicelines ) do
+                    table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "npcvoicechat/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
+                end
+            end
+        end
+    end
+
     SimpleTimer( 0, function()
         if LambdaVoiceProfiles then
-            NPCVC_LambdaVoiceProfile = LambdaVoiceProfiles
-        else
-            table_Empty( NPCVC_LambdaVoiceProfile )
-            local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
-
-            for _, voicePfp in ipairs( lambdaVPs ) do
-                NPCVC_LambdaVoiceProfile[ voicePfp ] = {}
+            for voicePfp, _ in pairs( LambdaVoiceProfiles ) do
+                NPCVC_VoiceProfiles[ voicePfp ] = {}
 
                 for voiceType, _ in pairs( voicelineDirs ) do 
                     local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
                     if !voicelines or #voicelines == 0 then continue end
 
-                    NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ] = {}
+                    NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
                     for _, voiceline in ipairs( voicelines ) do
-                        table_insert( NPCVC_LambdaVoiceProfile[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
+                        table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
                     end
+                end
+            end
+
+            return
+        end
+
+        local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+        if !lambdaVPs then return end
+
+        for _, voicePfp in ipairs( lambdaVPs ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = {}
+
+            for voiceType, _ in pairs( voicelineDirs ) do 
+                local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
+                if !voicelines or #voicelines == 0 then continue end
+
+                NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
+                for _, voiceline in ipairs( voicelines ) do
+                    table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
                 end
             end
         end
@@ -138,7 +171,7 @@ end
 UpdateData()
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
 
-local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using Lambda Players' voicelines", 0, 1 )
+local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standart NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
 local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
 local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
@@ -152,8 +185,8 @@ local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max"
 local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
 local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames", "0", cvarFlag, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
-local vcLambdaVoicePfp          = CreateConVar( "sv_npcvoicechat_lambdavoicepfp", "", cvarFlag, "Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
-local vcLambdaVoicePfpChance    = CreateConVar( "sv_npcvoicechat_lambdavoicepfp_spawnchance", "0", cvarFlag, "The chance the a NPC will use a random available Lambda Voice Profile as their voice profile after they spawn" )
+local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
+local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
 
 local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
 local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
@@ -179,7 +212,7 @@ function nextbotMETA:BecomeRagdoll( dmginfo )
 end
 
 local function GetVoiceLine( ent, voiceType )
-    local voicePfp = NPCVC_LambdaVoiceProfile[ ent.NPCVC_VoiceProfile ]
+    local voicePfp = NPCVC_VoiceProfiles[ ent.NPCVC_VoiceProfile ]
     if voicePfp then
         local voiceTbl = voicePfp[ voiceType ]
         if voiceTbl and #voiceTbl != 0 then
@@ -296,7 +329,7 @@ end
 
 local function OnEntityCreated( npc )
     SimpleTimer( 0, function()
-        if !IsValid( npc ) or !npc.IsDrGNextbot and !npc.LastPathingInfraction and ( !npc:IsNPC() or nonNPCNPCs[ npc:GetClass() ] ) then return end
+        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.IsDrGNextbot and !npc.LastPathingInfraction and ( !npc:IsNPC() or nonNPCNPCs[ npc:GetClass() ] ) then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
@@ -350,11 +383,13 @@ local function OnEntityCreated( npc )
             npc.NPCVC_ProfilePicture = profilePic
             npc.NPCVC_PfpBackgroundColor = pfpBgClr
 
-            local cvarVoice = vcLambdaVoicePfp:GetString()
-            local voicePfp = NPCVC_LambdaVoiceProfile[ cvarVoice ]
-            if !voicePfp and random( 1, 100 ) <= vcLambdaVoicePfpChance:GetInt() then
-                local voicePfps = table_GetKeys( NPCVC_LambdaVoiceProfile ) 
-                voicePfp = voicePfps[ random( #voicePfps ) ]
+            local cvarVoice = vcVoiceProfile:GetString()
+            local voicePfp = NPCVC_VoiceProfiles[ cvarVoice ]
+            if !voicePfp then 
+                if random( 1, 100 ) <= vcVoiceProfileChance:GetInt() then
+                    local voicePfps = table_GetKeys( NPCVC_VoiceProfiles ) 
+                    voicePfp = voicePfps[ random( #voicePfps ) ]
+                end
             else
                 voicePfp = cvarVoice
                 npc.NPCVC_IsVoiceProfileServerside = true
@@ -393,7 +428,7 @@ local function OnPlayerSpawnedNPC( ply, npc )
     SimpleTimer( 0, function()
         if !IsValid( npc ) or !npc.NPCVC_Initialized or npc.NPCVC_IsDuplicated or npc.NPCVC_IsVoiceProfileServerside then return end
 
-        local voicePfp = ply:GetInfo( "cl_npcvoicechat_lambdavoicepfp" )
+        local voicePfp = ply:GetInfo( "cl_npcvoicechat_spawnvoiceprofile" )
         if !voicePfp or #voicePfp == 0 then return end
         
         npc.NPCVC_VoiceProfile = voicePfp
