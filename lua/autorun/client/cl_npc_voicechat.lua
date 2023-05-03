@@ -176,8 +176,8 @@ local function UpdateSounds()
             continue
         end
 
-        local removeEnt = ent:GetRemoveEntity()
-        if !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or removeEnt != ent and !IsValid( removeEnt ) then
+        local srcEnt = ent:GetSoundSource()
+        if !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
             if IsValid( snd ) then snd:Stop() end
             table_remove( NPCVC_SoundEmitters, index )
             continue
@@ -187,7 +187,6 @@ local function UpdateSounds()
             local leftChan, rightChan = snd:GetLevel()
             sndData.VoiceVolume = ( ( leftChan + rightChan ) * 0.5 )
 
-            local srcEnt = ent:GetSoundSource()
             local lastPos = sndData.LastPlayPos
             if IsValid( srcEnt ) then
                 lastPos = srcEnt:GetPos()
@@ -205,9 +204,7 @@ local function UpdateSounds()
                 if is3D then
                     snd:Set3DEnabled( true )
                     snd:SetPos( lastPos )
-
-                    local hearDist = ( fadeDist * max( volMult * 0.75, 1 ) )
-                    snd:Set3DFadeDistance( hearDist, ( hearDist * 3 ) )
+                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.75, 1 ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
@@ -343,12 +340,8 @@ end
 local function OnCreateClientsideRagdoll( owner, ragdoll )
     SimpleTimer( 0.1, function()
         if !IsValid( owner ) or !IsValid( ragdoll ) then return end
-
         local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
-        if !IsValid( sndEmitter ) then return end
-
-        sndEmitter:SetSoundSource( ragdoll )
-        sndEmitter:SetRemoveEntity( ragdoll )
+        if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
     end )
 end
 
@@ -356,22 +349,23 @@ local function AddToolMenuTabs()
     spawnmenu.AddToolCategory( "Utilities", "YerSoMashy", "YerSoMashy" )
 end
 
-local clientColor = Color( 255, 145, 0 )
-local function ClientControlHelp( panel, text )
-    local help = panel:ControlHelp( text )
-    help:SetTextColor( clientColor )
-end
-
 local function PopulateToolMenu()
+    local clientColor = Color( 255, 145, 0 )
+    local serverColor = Color( 0, 174, 255 )
+    local function ColoredControlHelp( isClient, panel, text )
+        local help = panel:ControlHelp( text )
+        help:SetTextColor( isClient and clientColor or serverColor )
+    end
+
     spawnmenu.AddToolMenuOption( "Utilities", "YerSoMashy", "NPCSqueakersMenu", "NPC Voice Chat", "", "", function( panel ) 
         local clText = panel:Help( "Client-Side (User Settings):" )
         clText:SetTextColor( clientColor )
 
         panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 1 )
-        ClientControlHelp( panel, "Volume of NPCs' voices during their voicechat shenanigans" )
+        ColoredControlHelp( true, panel, "Volume of NPCs' voices during their voicechat shenanigans" )
 
         panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
-        ClientControlHelp( panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
+        ColoredControlHelp( true, panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
 
         local clVoicePfps
         if NPCVC_LambdaVoiceProfile then
@@ -387,23 +381,23 @@ local function PopulateToolMenu()
             end
             clVoicePfps:SetValue( curValue or "None" )
 
-            ClientControlHelp( panel, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
+            ColoredControlHelp( true, panel, "The Lambda Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
         end
 
         panel:CheckBox( "Global Voice Chat", "cl_npcvoicechat_globalvoicechat" )
-        ClientControlHelp( panel, "If NPC's voice chat can be heard globally and not in 3D" )
+        ColoredControlHelp( true, panel, "If NPC's voice chat can be heard globally and not in 3D" )
 
         panel:CheckBox( "Display Voice Icon", "cl_npcvoicechat_showvoiceicon" )
-        ClientControlHelp( panel, "If a voice icon should appear above NPC while they're speaking or using voicechat" )
+        ColoredControlHelp( true, panel, "If a voice icon should appear above NPC while they're speaking or using voicechat" )
 
         panel:CheckBox( "Display Voice Popups", "cl_npcvoicechat_showpopups" )
-        ClientControlHelp( panel, "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
+        ColoredControlHelp( true, panel, "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
 
         panel:NumSlider( "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", 0, 2000, 0 )
-        ClientControlHelp( panel, "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
+        ColoredControlHelp( true, panel, "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
 
         panel:NumSlider( "Popup Fadeout Time", "cl_npcvoicechat_popupfadetime", 0, 10, 1 )
-        ClientControlHelp( panel, "Time in seconds required for a voice popup to fully fadeout after not being used" )
+        ColoredControlHelp( true, panel, "Time in seconds required for a voice popup to fully fadeout after not being used" )
 
         panel:Help( "Popup Volume Color:" )
         local popupColor = vgui.Create( "DColorMixer", panel )
@@ -413,7 +407,7 @@ local function PopulateToolMenu()
         popupColor:SetConVarG( "cl_npcvoicechat_popupcolor_g" )
         popupColor:SetConVarB( "cl_npcvoicechat_popupcolor_b" )
 
-        ClientControlHelp( panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
+        ColoredControlHelp( true, panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
 
         if !LocalPlayer():IsSuperAdmin() then 
             panel:Help( "" )
@@ -425,29 +419,29 @@ local function PopulateToolMenu()
         svText:SetTextColor( Color( 0, 174, 255 ) )
 
         panel:CheckBox( "Enable NPC Voice Chat", "sv_npcvoicechat_enabled" )
-        panel:ControlHelp( "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines" )
+        ColoredControlHelp( false, panel, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines" )
 
         panel:Help( "NPC Type Toggles:" )
-        panel:CheckBox( "Allow Standart NPCs", "sv_npcvoicechat_allownpc" )
-        panel:CheckBox( "Allow VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
-        panel:CheckBox( "Allow DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
-        panel:CheckBox( "Allow 2D Chase Nextbots", "sv_npcvoicechat_allowsanic" )
+        panel:CheckBox( "Standart NPCs", "sv_npcvoicechat_allownpc" )
+        panel:CheckBox( "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
+        panel:CheckBox( "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
+        panel:CheckBox( "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
         panel:Help( "------------------------------------------------------------" )
 
         panel:CheckBox( "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged" )
-        panel:ControlHelp( "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
+        ColoredControlHelp( false, panel, "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
 
         panel:CheckBox( "Slightly Delay Playing", "sv_npcvoicechat_slightdelay" )
-        panel:ControlHelp( "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
+        ColoredControlHelp( false, panel, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
 
         panel:CheckBox( "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps" )
-        panel:ControlHelp( "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
+        ColoredControlHelp( false, panel, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
 
         local minPitch = panel:NumSlider( "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", 10, 100, 0 )
-        panel:ControlHelp( "The lowest pitch a NPC's voice can get upon spawning" )
+        ColoredControlHelp( false, panel, "The lowest pitch a NPC's voice can get upon spawning" )
        
         local maxPitch = panel:NumSlider( "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", 100, 255, 0 )
-        panel:ControlHelp( "The highest pitch a NPC's voice can get upon spawning" )
+        ColoredControlHelp( false, panel, "The highest pitch a NPC's voice can get upon spawning" )
 
         function minPitch:OnValueChanged( value )
             maxPitch:SetMin( value )
@@ -462,13 +456,13 @@ local function PopulateToolMenu()
 
         if LambdaVoiceProfiles then
             panel:CheckBox( "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines" )
-            panel:ControlHelp( "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
+            ColoredControlHelp( false, panel, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 
             panel:CheckBox( "Use Lambda Players Profile Pictures", "sv_npcvoicechat_uselambdapfppics" )
-            panel:ControlHelp( "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
+            ColoredControlHelp( false, panel, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
             
             panel:CheckBox( "Use Lambda Players Nicknames", "sv_npcvoicechat_uselambdanames" )
-            panel:ControlHelp( "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
+            ColoredControlHelp( false, panel, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
         end
 
         local svVoicePfps
@@ -485,10 +479,10 @@ local function PopulateToolMenu()
             end
             svVoicePfps:SetValue( curValue or "None" )
 
-            panel:ControlHelp( "The Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
+            ColoredControlHelp( false, panel, "The Lambda Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
             panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_lambdavoicepfp_spawnchance", 0, 100, 0 )
-            panel:ControlHelp( "The chance the a NPC will use a random available Lambda Voice Profile as their voice profile after they spawn" )
+            ColoredControlHelp( false, panel, "The chance the a NPC will use a random available Lambda Voice Profile as their voice profile after they spawn" )
         end
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
@@ -523,7 +517,7 @@ local function PopulateToolMenu()
 
         panel:Help( "------------------------------------------------------------" )
         panel:Button( "Update Data", "sv_npcvoicechat_updatedata" )
-        panel:ControlHelp( "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting. You should always do it after adding or removing stuff" )
+        ColoredControlHelp( false, panel, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting. You should always do it after adding or removing stuff" )
 
         panel:Help( "Voiceline Type Toggles:" )
         panel:CheckBox( "Idling", "sv_npcvoicechat_allowlines_idle" )
