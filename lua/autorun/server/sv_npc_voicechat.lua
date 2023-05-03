@@ -191,7 +191,7 @@ local function GetVoiceLine( ent, voiceType )
         end
     end
 
-    local voicelineTbl = ( ( #NPCVC_LambdaVoiceProfile != 0 and vcUseLambdaVoicelines:GetBool() ) and NPCVC_LambdaVoiceProfile or NPCVC_VoiceLines ) 
+    local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC_VoiceLines ) 
     local voiceTbl = voicelineTbl[ voiceType ]
     return voiceTbl[ random( #voiceTbl ) ]
 end
@@ -205,7 +205,7 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
     elseif npc:IsNPC() and !vcAllowNPCs:GetBool() then 
         return 
     end
-    if vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
+    if voiceType != "death" and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
 
     local sndEmitter = ents_Create( "npc_vc_sndemitter" )
     sndEmitter:SetPos( npc:GetPos() )
@@ -310,7 +310,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastTakeDamageTime = 0
         npc.NPCVC_LastSeenEnemyTime = 0
-        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 8 ) )
+        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 5, 10 ) )
         npc.NPCVC_NextDangerSoundTime = 0
         npc.NPCVC_LastVoiceLine = ""
 
@@ -540,7 +540,7 @@ local function OnServerThink()
 
                         local spotLine = ( ( !isPanicking and ( !lowHP or random( 1, 4 ) != 1 ) ) and "taunt" or "panic" )                            
                         if curEnemy != lastEnemy then
-                            if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
+                            if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
                                 PlaySoundFile( npc, spotLine )
                             end
                         elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
@@ -565,13 +565,13 @@ local function OnServerThink()
                             isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npc:GetClass() ] and !IsValid( npc:GetActiveWeapon() ) or npc:Disposition( curEnemy ) == D_FR ) )
                         end
 
-                        local spotLine = ( ( !isPanicking and ( !lowHP or random( 1, 3 ) != 1 ) ) and "taunt" or "panic" )                            
+                        local spotLine = ( ( !isPanicking and ( !lowHP or random( 1, 4 ) != 1 ) ) and "taunt" or "panic" )                            
                         if curState != npc.NPCVC_LastState then
-                            if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
+                            if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
                                 PlaySoundFile( npc, spotLine )
                             end
                         elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
-                            if curState == NPC_STATE_COMBAT then
+                            if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
                                 if vcAllowLines_CombatIdle:GetBool() then
                                     PlaySoundFile( npc, spotLine )
                                 end
@@ -586,7 +586,7 @@ local function OnServerThink()
 
             npc.NPCVC_LastEnemy = curEnemy
             if curTime >= npc.NPCVC_NextIdleSpeak then
-                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 8 ) )
+                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 5, 10 ) )
             end
         end
     end

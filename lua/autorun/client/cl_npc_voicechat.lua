@@ -1,5 +1,6 @@
 local net = net
 local ipairs = ipairs
+local pairs = pairs
 local SortedPairs = SortedPairs
 local IsValid = IsValid
 local SimpleTimer = timer.Simple
@@ -29,6 +30,7 @@ local surface_SetMaterial = surface.SetMaterial
 local surface_DrawRect = surface.DrawRect
 local surface_DrawTexturedRect = surface.DrawTexturedRect
 local End3D2D = cam.End3D2D
+local file_Find = file.Find
 
 local voiceIconMat      = Material( "voice/icntlk_pl" )
 local popup_BaseClr     = Color( 255, 255, 255, 255 )
@@ -202,8 +204,10 @@ local function UpdateSounds()
                 local is3D = sndData.Is3D
                 if is3D then
                     snd:Set3DEnabled( true )
-                    snd:Set3DFadeDistance( fadeDist * max( volMult * 0.75, 1 ), 0 )
                     snd:SetPos( lastPos )
+
+                    local hearDist = ( fadeDist * max( volMult * 0.75, 1 ) )
+                    snd:Set3DFadeDistance( hearDist, ( hearDist * 3 ) )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
@@ -327,8 +331,8 @@ local function DrawVoiceChat()
         end
 
         local nickname = vcData.Nick
-        if #nickname > 23 then 
-            nickname = string_sub( nickname, 0, 20 ) .. "..." 
+        if #nickname > 20 then 
+            nickname = string_sub( nickname, 0, 17 ) .. "..." 
         end
         DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
 
