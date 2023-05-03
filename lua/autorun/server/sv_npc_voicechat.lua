@@ -11,6 +11,7 @@ local cvarFlag = ( FCVAR_ARCHIVE + FCVAR_REPLICATED )
 local RealTime = RealTime
 local Rand = math.Rand
 local ents_GetAll = ents.GetAll
+local FindByClass = ents.FindByClass
 local CurTime = CurTime
 local ents_Create = ents.Create
 local table_GetKeys = table.GetKeys
@@ -329,7 +330,10 @@ end
 
 local function OnEntityCreated( npc )
     SimpleTimer( 0, function()
-        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.IsDrGNextbot and !npc.LastPathingInfraction and ( !npc:IsNPC() or nonNPCNPCs[ npc:GetClass() ] ) then return end
+        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
+
+        local npcClass = npc:GetClass()
+        if nonNPCNPCs[ npcClass ] then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
@@ -346,7 +350,7 @@ local function OnEntityCreated( npc )
         if npc.LastPathingInfraction then
             npc.NPCVC_VoiceIconHeight = 138
             npc.NPCVC_VoiceVolumeScale = 2
-        elseif npc:GetClass() == "npc_barnacle" then
+        elseif npcClass == "npc_barnacle" then
             npc.NPCVC_VoiceIconHeight = -64
             npc.NPCVC_VoiceVolumeScale = 1
         else
@@ -474,8 +478,9 @@ local function OnServerThink()
 
     for _, npc in ipairs( ents_GetAll() ) do
         if !IsValid( npc ) or !npc.NPCVC_Initialized then continue end
+        local npcClass = npc:GetClass()
 
-        if npc:GetClass() == "npc_turret_floor" then 
+        if npcClass == "npc_turret_floor" then 
             local selfDestructing = npc:GetInternalVariable( "m_bSelfDestructing" )
             if !selfDestructing then 
                 local curState = npc:GetNPCState()
@@ -541,7 +546,7 @@ local function OnServerThink()
                 end
             elseif npc:GetInternalVariable( "m_lifeState" ) == 0 then 
                 if !npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) then 
-                    local onFire = ( drownNPCs[ npc:GetClass() ] and npc:WaterLevel() >= 2 or npc:IsOnFire() )
+                    local onFire = ( drownNPCs[ npcClass ] and npc:WaterLevel() >= 2 or npc:IsOnFire() )
                     if onFire and !npc.NPCVC_WasOnFire and vcAllowLines_CatchOnFire:GetBool() then
                         PlaySoundFile( npc, "panic" )
                     end
@@ -564,7 +569,7 @@ local function OnServerThink()
                     curEnemy = npc:GetEnemy()
                     local lastEnemy = npc.NPCVC_LastEnemy
                     local isPanicking = ( npc.NPCVC_WasOnFire or !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
-                    if npc.IsVJBaseSNPC or npc.IsDrGNextbot or npc:GetClass() == "npc_barnacle" then
+                    if npc.IsVJBaseSNPC or npc.IsDrGNextbot or npcClass == "npc_barnacle" then
                         if rolledSpeech then
                             if !isPanicking then
                                 isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
@@ -594,7 +599,7 @@ local function OnServerThink()
                         else
                             if rolledSpeech then
                                 if !isPanicking then
-                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npc:GetClass() ] and !IsValid( npc:GetActiveWeapon() ) or npc:Disposition( curEnemy ) == D_FR ) )
+                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or npc:Disposition( curEnemy ) == D_FR ) )
                                 end
 
                                 local spotLine = ( ( !isPanicking and ( !lowHP or random( 1, 4 ) != 1 ) ) and "taunt" or "panic" )                            
@@ -624,13 +629,14 @@ local function OnServerThink()
                     SimpleTimer( 0.1, function()
                         if !IsValid( npc ) then return end
 
+                        local npcMdl = npc:GetModel()
                         local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
                         if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
-                            for _, barn in ipairs( ents.FindByClass( "npc_barnacle" ) ) do
+                            for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
                                 if !IsValid( barn ) or barn:Health() <= 0 or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
-                                
+
                                 local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
-                                if !IsValid( ragdoll ) or ragdoll:GetModel() != npc:GetModel() then continue end
+                                if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
 
                                 sndEmitter:SetSoundSource( ragdoll )
                                 break
