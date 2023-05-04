@@ -1,7 +1,7 @@
 local net = net
 local ipairs = ipairs
 local pairs = pairs
-local SortedPairs = SortedPairs
+local SortedPairsByValue = SortedPairsByValue
 local IsValid = IsValid
 local SimpleTimer = timer.Simple
 local random = math.random
@@ -61,24 +61,25 @@ local function UpdateVoiceProfiles()
     local _, voicePfpDirs = file_Find( "sound/npcvoicechat/voiceprofiles/*", "GAME" )
     if voicePfpDirs then
         for _, voicePfp in ipairs( voicePfpDirs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = false
+            NPCVC_VoiceProfiles[ voicePfp ] = ""
         end
     end
 
-    if LambdaVoiceProfiles then
-        for voicePfp, _ in pairs( LambdaVoiceProfiles ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = true
+    local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
+    if lambdaVPs then
+        for _, voicePfp in ipairs( lambdaVPs ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = "[LambdaVP] "
         end
-    else
-        local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
-        if lambdaVPs then
-            for _, voicePfp in ipairs( lambdaVPs ) do
-                NPCVC_VoiceProfiles[ voicePfp ] = true
-            end
+    end
+    
+    local _, zetaVPs = file_Find( "sound/zetaplayer/custom_vo/*", "GAME" )
+    if zetaVPs then
+        for _, voicePfp in ipairs( zetaVPs ) do
+            NPCVC_VoiceProfiles[ voicePfp ] = "[ZetaVP] "
         end
     end
 end
-SimpleTimer( 0, UpdateVoiceProfiles )
+UpdateVoiceProfiles()
 
 local function PlaySoundFile( sndDir, vcData, is3D )
     local ent = vcData.Emitter
@@ -372,9 +373,9 @@ local function PopulateToolMenu()
         clVoicePfps:AddChoice( "None", "" )
         local curValue
         local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
-        for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+        for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
             if curVoicePfp == voiceProfile then curValue = voiceProfile end
-            clVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
+            clVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
         end
         clVoicePfps:SetValue( curValue or "None" )
         ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
@@ -463,15 +464,18 @@ local function PopulateToolMenu()
         svVoicePfps:AddChoice( "None", "" )
         local curValue
         local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
-        for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+        for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
             if curVoicePfp == voiceProfile then curValue = voiceProfile end
-            svVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
+            svVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
         end
         svVoicePfps:SetValue( curValue or "None" )
         ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
         panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", 0, 100, 0 )
         ColoredControlHelp( false, panel, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
+
+        panel:CheckBox( "Enable Profile Fallback", "sv_npcvoicechat_voiceprofilefallbacks" )
+        ColoredControlHelp( false, panel, "If NPC with a voice profile should fallback to standart voicelines instead of playing nothing if its profile doesn't have a specified voice type in it" )
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
             UpdateVoiceProfiles()
@@ -481,9 +485,9 @@ local function PopulateToolMenu()
                 clVoicePfps:AddChoice( "None", "" )
                 local curValue
                 local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
-                for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+                for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
                     if curVoicePfp == voiceProfile then curValue = voiceProfile end
-                    clVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
+                    clVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
                 end
                 clVoicePfps:SetValue( curValue or "None" )
             end
@@ -493,9 +497,9 @@ local function PopulateToolMenu()
                 svVoicePfps:AddChoice( "None", "" )
                 local curValue
                 local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
-                for voiceProfile, isLambdaVP in SortedPairs( NPCVC_VoiceProfiles ) do
+                for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
                     if curVoicePfp == voiceProfile then curValue = voiceProfile end
-                    svVoicePfps:AddChoice( ( isLambdaVP and "[LambdaVP] " or "" ) .. voiceProfile, voiceProfile )
+                    svVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
                 end
                 svVoicePfps:SetValue( curValue or "None" )
             end

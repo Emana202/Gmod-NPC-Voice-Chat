@@ -81,6 +81,26 @@ end )
 
 file.CreateDir( "npcvoicechat" )
 
+local function AddVoiceProfile( path )
+    local _, voicePfpDirs = file_Find( "sound/" .. path .. "/*", "GAME" )
+    if !voicePfpDirs then return end
+    
+    for _, voicePfp in ipairs( voicePfpDirs ) do
+        for voiceType, _ in pairs( voicelineDirs ) do 
+            local voiceTypePath = path .. "/" .. voicePfp .. "/" .. voiceType
+            local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME" )
+            if !voicelines or #voicelines == 0 then continue end
+
+            NPCVC_VoiceProfiles[ voicePfp ] = ( NPCVC_VoiceProfiles[ voicePfp ] or {} )
+            NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
+
+            for _, voiceline in ipairs( voicelines ) do
+                table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], voiceTypePath .. "/" .. voiceline )
+            end
+        end
+    end
+end
+
 local function UpdateData( ply )
     if IsValid( ply ) and !ply:IsSuperAdmin() then return end
 
@@ -110,66 +130,15 @@ local function UpdateData( ply )
     end
 
     table_Empty( NPCVC_VoiceProfiles )
-    
-    local _, voicePfpDirs = file_Find( "sound/npcvoicechat/voiceprofiles/*", "GAME" )
-    if voicePfpDirs then
-        for _, voicePfp in ipairs( voicePfpDirs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = {}
-
-            for voiceType, _ in pairs( voicelineDirs ) do 
-                local voicelines = file_Find( "sound/npcvoicechat/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
-                if !voicelines or #voicelines == 0 then continue end
-
-                NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
-                for _, voiceline in ipairs( voicelines ) do
-                    table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "npcvoicechat/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
-                end
-            end
-        end
-    end
-
-    SimpleTimer( 0, function()
-        if LambdaVoiceProfiles then
-            for voicePfp, _ in pairs( LambdaVoiceProfiles ) do
-                NPCVC_VoiceProfiles[ voicePfp ] = {}
-
-                for voiceType, _ in pairs( voicelineDirs ) do 
-                    local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
-                    if !voicelines or #voicelines == 0 then continue end
-
-                    NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
-                    for _, voiceline in ipairs( voicelines ) do
-                        table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
-                    end
-                end
-            end
-
-            return
-        end
-
-        local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
-        if !lambdaVPs then return end
-
-        for _, voicePfp in ipairs( lambdaVPs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = {}
-
-            for voiceType, _ in pairs( voicelineDirs ) do 
-                local voicelines = file_Find( "sound/lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/*", "GAME" )
-                if !voicelines or #voicelines == 0 then continue end
-
-                NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
-                for _, voiceline in ipairs( voicelines ) do
-                    table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], "lambdaplayers/voiceprofiles/" .. voicePfp .. "/" .. voiceType .. "/" .. voiceline )
-                end
-            end
-        end
-    end )
+    AddVoiceProfile( "npcvoicechat/voiceprofiles" )
+    AddVoiceProfile( "lambdaplayers/voiceprofiles" )
+    AddVoiceProfile( "zetaplayer/custom_vo" )
 
     net.Start( "npcsqueakers_updatespawnmenu" )
     net.Broadcast()
 end
 
-UpdateData()
+--UpdateData()
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
 
 local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
@@ -188,6 +157,7 @@ local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppic
 local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames", "0", cvarFlag, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
 local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
+local vcVoiceProfileFallback    = CreateConVar( "sv_npcvoicechat_voiceprofilefallbacks", "0", cvarFlag, "If NPC with a voice profile should fallback to default voicelines if its profile doesn't have a specified voice type in it" )
 
 local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
 local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
@@ -218,6 +188,8 @@ local function GetVoiceLine( ent, voiceType )
         local voiceTbl = voicePfp[ voiceType ]
         if voiceTbl and #voiceTbl != 0 then
             return voiceTbl[ random( #voiceTbl ) ]
+        elseif !vcVoiceProfileFallback:GetBool() then
+            return
         end
     end
 
@@ -237,13 +209,15 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
     end
     if voiceType != "death" and voiceType != "panic" and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
 
+    local sndName = GetVoiceLine( npc, voiceType )
+    if !sndName then return end
+
     local sndEmitter = ents_Create( "npc_vc_sndemitter" )
     sndEmitter:SetPos( npc:GetPos() )
     sndEmitter:SetOwner( npc )
     sndEmitter.DontRemoveEntity = dontDeleteOnRemove
     sndEmitter:Spawn()
 
-    local sndName = GetVoiceLine( npc, voiceType )
     local vcData = {
         Emitter = sndEmitter,
         EntIndex = npc:GetCreationID(),
