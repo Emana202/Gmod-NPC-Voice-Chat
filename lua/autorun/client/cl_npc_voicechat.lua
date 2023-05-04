@@ -90,7 +90,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
             PlaySoundFile( sndDir, vcData, false )
             return
         elseif !IsValid( snd ) then
-            print( "NPC Voice Chat Error: Sound file " .. sndDir .. " failed to open!" )
+            print( "NPC Voice Chat Error: Sound file " .. sndDir .. " failed to open!\nError Index: " .. errorName .. "#" .. errorId )
             return
         end
 
@@ -118,8 +118,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
             LastPlayPos = playPos,
             IconHeight = vcData.IconHeight,
             VolumeMult = volMult,
-            Is3D = is3D,
-            VoiceVolume = 0
+            Is3D = is3D
         }
 
         local entIndex = vcData.EntIndex
@@ -170,24 +169,14 @@ local function UpdateSounds()
     for index, sndData in ipairs( NPCVC_SoundEmitters ) do
         local ent = sndData.Entity
         local snd = sndData.Sound
-
-        if !IsValid( ent ) then
-            if IsValid( snd ) then snd:Stop() end
-            table_remove( NPCVC_SoundEmitters, index )
-            continue
-        end
-
         local srcEnt = ent:GetSoundSource()
-        if !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
+        if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
             if IsValid( snd ) then snd:Stop() end
             table_remove( NPCVC_SoundEmitters, index )
             continue
         end
 
         if enabled then
-            local leftChan, rightChan = snd:GetLevel()
-            sndData.VoiceVolume = ( ( leftChan + rightChan ) * 0.5 )
-
             local lastPos = sndData.LastPlayPos
             if IsValid( srcEnt ) then
                 lastPos = srcEnt:GetPos()
@@ -227,9 +216,7 @@ local function DrawVoiceIcons()
         ang:RotateAroundAxis( ang:Up(), -90 )
         ang:RotateAroundAxis( ang:Forward(), 90 )
 
-        local sndVol = sndData.VoiceVolume
         local pos = ( sndData.LastPlayPos + vector_up * sndData.IconHeight )
-        
         Start3D2D( pos, ang, 1 )
             surface_SetDrawColor( 255, 255, 255 )
             surface_SetMaterial( voiceIconMat )
