@@ -62,7 +62,6 @@ local function UpdateVoiceProfiles()
     if voicePfpDirs then
         for _, voicePfp in ipairs( voicePfpDirs ) do
             NPCVC_VoiceProfiles[ voicePfp ] = false
-            profileCount = ( profileCount + 1 )
         end
     end
 
@@ -329,8 +328,8 @@ local function DrawVoiceChat()
         end
 
         local nickname = vcData.Nick
-        if #nickname > 20 then 
-            nickname = string_sub( nickname, 0, 17 ) .. "..." 
+        if #nickname > 22 then 
+            nickname = string_sub( nickname, 0, 20 ) .. "..." 
         end
         DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
 

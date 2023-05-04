@@ -343,7 +343,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastTakeDamageTime = 0
         npc.NPCVC_LastSeenEnemyTime = 0
-        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 5, 10 ) )
+        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 10 ) )
         npc.NPCVC_NextDangerSoundTime = 0
         npc.NPCVC_LastVoiceLine = ""
 
@@ -649,7 +649,7 @@ local function OnServerThink()
             npc.NPCVC_LastEnemy = curEnemy
             
             if curTime >= npc.NPCVC_NextIdleSpeak then
-                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 5, 10 ) )
+                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
             end
         end
     end
