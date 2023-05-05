@@ -13,13 +13,17 @@ if ( SERVER ) then
 
     local IsValid = IsValid
     local CurTime = CurTime
+    local RealTime = RealTime
+    local max = math.max
 
     function ENT:Initialize()
         self:SetRenderMode( RENDERMODE_NONE )
         self:DrawShadow( false )
         self:SetNotSolid( false )
         self:SetMoveType( MOVETYPE_FLYGRAVITY )
+
         self.SpeechPlayTime = ( RealTime() + 5 )
+        NPCVC_TalkingNPCCount = ( NPCVC_TalkingNPCCount + 1 )
 
         local owner = self:GetOwner()
         if IsValid( owner ) then
@@ -41,6 +45,10 @@ if ( SERVER ) then
 
         self:NextThink( CurTime() + 0.1 )
         return true
+    end
+
+    function ENT:OnRemove()
+        NPCVC_TalkingNPCCount = max( 0, NPCVC_TalkingNPCCount - 1 )
     end
 
 end

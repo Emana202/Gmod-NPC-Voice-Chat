@@ -44,6 +44,7 @@ local vcShowIcon        = CreateClientConVar( "cl_npcvoicechat_showvoiceicon", "
 local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "0", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
 local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "0", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
+local vcPopupDrawPfp    = CreateClientConVar( "cl_npcvoicechat_popupdrawpfp", "1", nil, nil, "If the NPC's voice popup should draw its profile picture", 0, 1 )
 
 local vcPopupColorR     = CreateClientConVar( "cl_npcvoicechat_popupcolor_r", "0", nil, nil, "The red color of voice popup when the NPC is using it", 0, 255 )
 local vcPopupColorG     = CreateClientConVar( "cl_npcvoicechat_popupcolor_g", "255", nil, nil, "The green color of voice popup when the NPC is using it", 0, 255 )
@@ -289,6 +290,7 @@ local function DrawVoiceChat()
     local popupClrR = vcPopupColorR:GetInt()
     local popupClrG = vcPopupColorG:GetInt()
     local popupClrB = vcPopupColorB:GetInt()
+    local drawPfp = vcPopupDrawPfp:GetBool()
 
     for _, vcData in SortedPairsByMemberValue( drawPopupIndexes, "FirstDisplayTime" ) do
         local drawAlpha = vcData.AlphaRatio
@@ -302,17 +304,19 @@ local function DrawVoiceChat()
 
         RoundedBox( 4, drawX, drawY, 246, 40, popup_BoxClr )
         
-        local bgClr = vcData.PfpBackgroundColor
-        if bgClr then
-            bgClr.a = popup_BaseClr.a
-            surface_SetDrawColor( bgClr )
-            surface_DrawRect( drawX + 4, drawY + 4, 32, 32 )
-        end
-        local pfp = vcData.ProfilePicture
-        if pfp then
-            surface_SetDrawColor( popup_BaseClr )
-            surface_SetMaterial( pfp )
-            surface_DrawTexturedRect( drawX + 4, drawY + 4, 32, 32 )
+        if drawPfp then
+            local bgClr = vcData.PfpBackgroundColor
+            if bgClr then
+                bgClr.a = popup_BaseClr.a
+                surface_SetDrawColor( bgClr )
+                surface_DrawRect( drawX + 4, drawY + 4, 32, 32 )
+            end
+            local pfp = vcData.ProfilePicture
+            if pfp then
+                surface_SetDrawColor( popup_BaseClr )
+                surface_SetMaterial( pfp )
+                surface_DrawTexturedRect( drawX + 4, drawY + 4, 32, 32 )
+            end
         end
 
         local nickname = vcData.Nick
@@ -345,6 +349,27 @@ local function PopulateToolMenu()
         help:SetTextColor( isClient and clientColor or serverColor )
     end
 
+    local function GetComboBoxVoiceProfiles( panel, comboBox, cvarName )
+        if comboBox == false then
+            comboBox = panel:ComboBox( "Voice Profile", cvarName )
+            comboBox:SetSortItems( false )
+        else
+            if !IsValid( comboBox ) then return end
+            comboBox:Clear()
+        end
+
+        comboBox:AddChoice( "None", "" )
+        local curVoicePfp, curValue = GetConVar( cvarName ):GetString()
+        for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
+            local prettyName = prefix .. vp
+            comboBox:AddChoice( prettyName, vp )
+            if curVoicePfp == vp then curValue = prettyName end
+        end
+        comboBox:SetValue( curValue or "None" )
+
+        return comboBox
+    end
+
     spawnmenu.AddToolMenuOption( "Utilities", "YerSoMashy", "NPCSqueakersMenu", "NPC Voice Chat", "", "", function( panel ) 
         local clText = panel:Help( "Client-Side (User Settings):" )
         clText:SetTextColor( clientColor )
@@ -355,16 +380,7 @@ local function PopulateToolMenu()
         panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
         ColoredControlHelp( true, panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
 
-        local clVoicePfps = panel:ComboBox( "Voice Profile", "cl_npcvoicechat_spawnvoiceprofile" )
-        clVoicePfps:SetSortItems( false )
-        clVoicePfps:AddChoice( "None", "" )
-        local curValue
-        local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
-        for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
-            if curVoicePfp == voiceProfile then curValue = voiceProfile end
-            clVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
-        end
-        clVoicePfps:SetValue( curValue or "None" )
+        local clVoicePfps = GetComboBoxVoiceProfiles( panel, false, "cl_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
         panel:CheckBox( "Global Voice Chat", "cl_npcvoicechat_globalvoicechat" )
@@ -375,6 +391,9 @@ local function PopulateToolMenu()
 
         panel:CheckBox( "Display Voice Popups", "cl_npcvoicechat_showpopups" )
         ColoredControlHelp( true, panel, "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
+
+        panel:CheckBox( "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp" )
+        ColoredControlHelp( true, panel, "If the NPC's voice popup should draw its profile picture" )
 
         panel:NumSlider( "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", 0, 2000, 0 )
         ColoredControlHelp( true, panel, "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
@@ -433,6 +452,12 @@ local function PopulateToolMenu()
             minPitch:SetMax( value )
         end
 
+        panel:NumSlider( "Speak Limit", "sv_npcvoicechat_speaklimit", 0, 15, 0 )
+        ColoredControlHelp( false, panel, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable" )
+
+        panel:CheckBox( "Limit Doesn't Affect Death and Panic", "sv_npcvoicechat_speaklimit_dontaffectdeathpanic" )
+        ColoredControlHelp( false, panel, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines" )
+
         if LambdaVoiceProfiles then
             panel:Help( "Lambda-Related Stuff:" )
 
@@ -446,16 +471,7 @@ local function PopulateToolMenu()
             ColoredControlHelp( false, panel, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
         end
 
-        local svVoicePfps = panel:ComboBox( "Voice Profile", "sv_npcvoicechat_spawnvoiceprofile" )
-        svVoicePfps:SetSortItems( false )
-        svVoicePfps:AddChoice( "None", "" )
-        local curValue
-        local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
-        for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
-            if curVoicePfp == voiceProfile then curValue = voiceProfile end
-            svVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
-        end
-        svVoicePfps:SetValue( curValue or "None" )
+        local svVoicePfps = GetComboBoxVoiceProfiles( panel, false, "sv_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
         panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", 0, 100, 0 )
@@ -466,30 +482,8 @@ local function PopulateToolMenu()
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
             UpdateVoiceProfiles()
-
-            if IsValid( clVoicePfps ) then
-                clVoicePfps:Clear()
-                clVoicePfps:AddChoice( "None", "" )
-                local curValue
-                local curVoicePfp = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" ):GetString()
-                for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
-                    if curVoicePfp == voiceProfile then curValue = voiceProfile end
-                    clVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
-                end
-                clVoicePfps:SetValue( curValue or "None" )
-            end
-
-            if IsValid( svVoicePfps ) then
-                svVoicePfps:Clear()
-                svVoicePfps:AddChoice( "None", "" )
-                local curValue
-                local curVoicePfp = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" ):GetString()
-                for voiceProfile, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
-                    if curVoicePfp == voiceProfile then curValue = voiceProfile end
-                    svVoicePfps:AddChoice( prefix .. voiceProfile, voiceProfile )
-                end
-                svVoicePfps:SetValue( curValue or "None" )
-            end
+            GetComboBoxVoiceProfiles( panel, clVoicePfps, "cl_npcvoicechat_spawnvoiceprofile" )
+            GetComboBoxVoiceProfiles( panel, svVoicePfps, "sv_npcvoicechat_spawnvoiceprofile" )
         end )
 
         panel:Help( "------------------------------------------------------------" )
