@@ -213,7 +213,9 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
 
     local isPanicType = ( voiceType == "death" or voiceType == "panic" )
     if !isPanicType and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
-    if ( !isPanicType or !vcLimitAffectsDeathPanic:GetBool() ) and NPCVC_TalkingNPCCount >= vcSpeakLimit:GetInt() then return end
+    
+    local speakLimit = vcSpeakLimit:GetInt()
+    if speakLimit > 0 and ( !isPanicType or !vcLimitAffectsDeathPanic:GetBool() ) and NPCVC_TalkingNPCCount >= speakLimit then return end
 
     local sndName = GetVoiceLine( npc, voiceType )
     if !sndName then return end
