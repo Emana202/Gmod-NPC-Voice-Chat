@@ -170,7 +170,7 @@ local function UpdateSounds()
     for index, sndData in ipairs( NPCVC_SoundEmitters ) do
         local ent = sndData.Entity
         local snd = sndData.Sound
-        local srcEnt = ent:GetSoundSource()
+        local srcEnt = ( IsValid( ent ) and ent:GetSoundSource() )
         if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
             if IsValid( snd ) then snd:Stop() end
             table_remove( NPCVC_SoundEmitters, index )
