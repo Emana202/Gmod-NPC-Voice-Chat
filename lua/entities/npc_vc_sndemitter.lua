@@ -23,7 +23,7 @@ if ( SERVER ) then
         self:SetMoveType( MOVETYPE_FLYGRAVITY )
 
         self.SpeechPlayTime = ( RealTime() + 5 )
-        NPCVC_TalkingNPCCount = ( NPCVC_TalkingNPCCount + 1 )
+        NPCVC_TalkingNPCs[ self ] = true
 
         local owner = self:GetOwner()
         if IsValid( owner ) then
@@ -39,8 +39,11 @@ if ( SERVER ) then
         if RealTime() > self.SpeechPlayTime then self:Remove() return end
 
         local srcEnt = self:GetSoundSource()
-        if srcEnt != self and IsValid( srcEnt ) then 
+        if IsValid( srcEnt ) then 
             self:SetPos( srcEnt:GetPos() )
+        elseif self:GetRemoveOnNoSource() then
+            self:Remove()
+            return
         end
 
         self:NextThink( CurTime() + 0.1 )
@@ -48,7 +51,7 @@ if ( SERVER ) then
     end
 
     function ENT:OnRemove()
-        NPCVC_TalkingNPCCount = max( 0, NPCVC_TalkingNPCCount - 1 )
+        NPCVC_TalkingNPCs[ self ] = nil
     end
 
 end

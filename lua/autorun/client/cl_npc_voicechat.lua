@@ -12,8 +12,6 @@ local RealTime = RealTime
 local PlayFile = sound.PlayFile
 local EyeAngles = EyeAngles
 local LocalPlayer = LocalPlayer
-local cam = cam
-local surface = surface
 local table_remove = table.remove
 local max = math.max
 local GetConVar = GetConVar
@@ -171,6 +169,7 @@ local function UpdateSounds()
         local ent = sndData.Entity
         local snd = sndData.Sound
         local srcEnt = ( IsValid( ent ) and ent:GetSoundSource() )
+
         if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
             if IsValid( snd ) then snd:Stop() end
             table_remove( NPCVC_SoundEmitters, index )
@@ -418,7 +417,7 @@ local function PopulateToolMenu()
 
         panel:Help( "------------------------------------------------------------" )
         local svText = panel:Help( "Server-Side (Admin Settings):" )
-        svText:SetTextColor( Color( 0, 174, 255 ) )
+        svText:SetTextColor( serverColor )
 
         panel:CheckBox( "Enable NPC Voice Chat", "sv_npcvoicechat_enabled" )
         ColoredControlHelp( false, panel, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines" )

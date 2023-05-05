@@ -13,10 +13,12 @@ local Rand = math.Rand
 local ents_GetAll = ents.GetAll
 local FindByClass = ents.FindByClass
 local CurTime = CurTime
+local Color = Color
 local ents_Create = ents.Create
 local table_GetKeys = table.GetKeys
 local table_insert = table.insert
 local table_Copy = table.Copy
+local table_Count = table.Count
 local table_RemoveByValue = table.RemoveByValue
 local FindInSphere = ents.FindInSphere
 local IsSinglePlayer = game.SinglePlayer
@@ -59,7 +61,8 @@ NPCVC_NickNames         = NPCVC_NickNames or {}
 NPCVC_VoiceLines        = NPCVC_VoiceLines or {}
 NPCVC_ProfilePictures   = NPCVC_ProfilePictures or {}
 NPCVC_VoiceProfiles     = NPCVC_VoiceProfiles or {}
-NPCVC_TalkingNPCCount   = NPCVC_TalkingNPCCount or 0
+NPCVC_IsInitialized     = NPCVC_IsInitialized or false
+NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
@@ -139,7 +142,11 @@ local function UpdateData( ply )
     net.Broadcast()
 end
 
-UpdateData()
+if !NPCVC_IsInitialized then
+    UpdateData()
+    NPCVC_IsInitialized = true
+end
+
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
 
 local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
@@ -201,7 +208,7 @@ local function GetVoiceLine( ent, voiceType )
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
-local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
+local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.IsDrGNextbot and ( npc:IsPossessed() or !vcAllowDrGBase:GetBool() ) then return end
@@ -214,8 +221,11 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
     local isPanicType = ( voiceType == "death" or voiceType == "panic" )
     if !isPanicType and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
     
-    local speakLimit = vcSpeakLimit:GetInt()
-    if speakLimit > 0 and ( !isPanicType or !vcLimitAffectsDeathPanic:GetBool() ) and NPCVC_TalkingNPCCount >= speakLimit then return end
+    local oldEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
+    if !NPCVC_TalkingNPCs[ oldEmitter ] then
+        local speakLimit = vcSpeakLimit:GetInt()
+        if speakLimit > 0 and ( !isPanicType or !vcLimitAffectsDeathPanic:GetBool() ) and table_Count( NPCVC_TalkingNPCs ) >= speakLimit then return end
+    end
 
     local sndName = GetVoiceLine( npc, voiceType )
     if !sndName then return end
@@ -238,7 +248,7 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
     local pfpBgClr = npc.NPCVC_PfpBackgroundColor
     if pfpBgClr then vcData.PfpBackgroundColor = pfpBgClr end
 
-    local playDelay = ( IsSinglePlayer() and 0 or 0.1 )
+    local playDelay = ( ( IsSinglePlayer() and !isInput ) and 0 or 0.1 )
     if vcSlightDelay:GetBool() then playDelay = ( random( ( playDelay * 10 ), 5 ) / 10 ) end
     SimpleTimer( playDelay, function()
         net.Start( "npcsqueakers_playsound" )
@@ -246,8 +256,6 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove )
             net.WriteTable( vcData )
         net.Broadcast()
     end )
-
-    local oldEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     if IsValid( oldEmitter ) then oldEmitter:Remove() end
 
     npc.NPCVC_LastVoiceLine = voiceType
@@ -323,7 +331,6 @@ local function OnEntityCreated( npc )
         npc.NPCVC_WasOnFire = false
         npc.NPCVC_IsSelfDestructing = false
         npc.NPCVC_LastState = -1
-        npc.NPCVC_LastTakeDamageTime = 0
         npc.NPCVC_LastSeenEnemyTime = 0
         npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 10 ) )
         npc.NPCVC_NextDangerSoundTime = 0
@@ -430,9 +437,9 @@ local function OnPlayerSpawnedNPC( ply, npc )
     end )
 end
 
-local function OnNPCKilled( npc, attacker, inflictor )
+local function OnNPCKilled( npc, attacker, inflictor, isInput )
     if vcAllowLines_Death:GetBool() then
-        PlaySoundFile( npc, "death", true )
+        PlaySoundFile( npc, "death", true, isInput )
     end
 
     CheckNearbyNPCOnDeath( npc, attacker )
@@ -535,16 +542,7 @@ local function OnServerThink()
                     npc.NPCVC_WasOnFire = onFire
 
                     local lowHP = npc.NPCVC_IsLowHealth
-                    if !lowHP then
-                        local hpThreshold = Rand( 0.2, 0.5 )
-                        if npc:Health() <= ( npc:GetMaxHealth() * hpThreshold ) then
-                            npc.NPCVC_IsLowHealth = hpThreshold
-
-                            if rolledSpeech and ( curTime - npc.NPCVC_LastTakeDamageTime ) <= 5 and vcAllowLines_LowHealth:GetBool() then
-                                PlaySoundFile( npc, "panic" )
-                            end
-                        end
-                    elseif npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
+                    if lowHP and npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
                         npc.NPCVC_IsLowHealth = false
                     end
 
@@ -638,8 +636,27 @@ local function OnServerThink()
 end
 
 local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
-    if !tookDamage or !ent.NPCVC_Initialized then return end
-    ent.NPCVC_LastTakeDamageTime = CurTime()
+    if !tookDamage or !ent.NPCVC_Initialized or ent.NPCVC_IsLowHealth then return end
+
+    local hpThreshold = Rand( 0.2, 0.5 )
+    if ent:Health() > ( ent:GetMaxHealth() * hpThreshold ) then return end
+
+    ent.NPCVC_IsLowHealth = hpThreshold
+    if random( 1, 100 ) > ent.NPCVC_SpeechChance then return end
+
+    SimpleTimer( 0.1, function()
+        if !IsValid( ent ) or ent:GetInternalVariable( "m_lifeState" ) != 0 then return end
+        if !vcAllowLines_LowHealth:GetBool() then return end
+        PlaySoundFile( ent, "panic" )
+    end )
+end
+
+local function OnAcceptInput( ent, input, activator, caller, value )
+    if !ent.NPCVC_Initialized then return end
+
+    if input == "BecomeRagdoll" then
+        OnNPCKilled( ent, activator, caller, true )
+    end
 end
 
 hook.Add( "OnEntityCreated", "NPCSqueakers_OnEntityCreated", OnEntityCreated )
@@ -649,3 +666,4 @@ hook.Add( "PlayerDeath", "NPCSqueakers_OnPlayerDeath", OnPlayerDeath )
 hook.Add( "CreateEntityRagdoll", "NPCSqueakers_OnCreateEntityRagdoll", OnCreateEntityRagdoll )
 hook.Add( "Think", "NPCSqueakers_OnServerThink", OnServerThink )
 hook.Add( "PostEntityTakeDamage", "NPCSqueakers_OnPostEntityTakeDamage", OnPostEntityTakeDamage )
+hook.Add( "AcceptInput", "NPCSqueakers_OnAcceptInput", OnAcceptInput )
