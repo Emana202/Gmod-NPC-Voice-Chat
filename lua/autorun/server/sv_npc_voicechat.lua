@@ -67,7 +67,6 @@ NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
-util.AddNetworkString( "npcsqueakers_setsoundsrc" )
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
@@ -158,6 +157,7 @@ local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "1", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
+local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "0", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
 local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 10, 100 )
 local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 100, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
@@ -363,8 +363,13 @@ local function OnEntityCreated( npc )
             local voicePitch = random( vcPitchMin:GetInt(), vcPitchMax:GetInt() )
             npc.NPCVC_VoicePitch = voicePitch
             
-            local openName = GetAvailableNickname()
-            npc.NPCVC_Nickname = openName
+            local nickName
+            if vcUseRealNames:GetBool() then
+                nickName = "#" .. npcClass
+            else
+                nickName = GetAvailableNickname()
+            end
+            npc.NPCVC_Nickname = nickName
 
             local profilePic, pfpBgClr
             if vcUseCustomPfps:GetBool() then
@@ -400,7 +405,7 @@ local function OnEntityCreated( npc )
             StoreEntityModifier( npc, "NPC VoiceChat - NPC's Voice Data", {
                 SpeechChance = speechChance,
                 VoicePitch = voicePitch,
-                NickName = openName,
+                NickName = nickName,
                 ProfilePicture = profilePic,
                 VoiceProfile = voicePfp,
                 PfpBackgroundColor = pfpBgClr

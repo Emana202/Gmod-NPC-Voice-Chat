@@ -12,11 +12,6 @@ function ENT:SetupDataTables()
         self:NetworkVarNotify( "SoundSource", function( self, name, old, new )
             if old == new then return end
             self:SetNW2Entity( "npcsqueakers_soundsrc", new )
-
-            net.Start( "npcsqueakers_setsoundsrc" )
-                net.WriteEntity( self )
-                net.WriteEntity( new )
-            net.Broadcast()
         end )
     end
 end

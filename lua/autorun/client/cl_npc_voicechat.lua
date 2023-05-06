@@ -81,14 +81,11 @@ end
 UpdateVoiceProfiles()
 
 local function GetSoundSource( ent )
-    local srcEnt = ent.SoundSourceEnt
-    local netFunc = ent.GetSoundSource
-    if !IsValid( srcEnt ) then
-        if netFunc then 
-            srcEnt = netFunc( ent )
-        else
-            srcEnt = ent:GetNW2Entity( "npcsqueakers_soundsrc", NULL )
-        end
+    local netFunc, srcEnt = ent.GetSoundSource
+    if netFunc then
+        srcEnt = netFunc( ent )
+    else
+        srcEnt = ent:GetNW2Entity( "npcsqueakers_soundsrc", NULL )
     end
     return srcEnt, netFunc
 end
@@ -167,11 +164,6 @@ end
 
 net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), true )
-end )
-
-net.Receive( "npcsqueakers_setsoundsrc", function()
-    local ent = net.ReadEntity()
-    if IsValid( ent ) then ent.SoundSourceEnt = net.ReadEntity() end
 end )
 
 local function UpdateSounds()
@@ -452,6 +444,9 @@ local function PopulateToolMenu()
 
         panel:CheckBox( "Slightly Delay Playing", "sv_npcvoicechat_slightdelay" )
         ColoredControlHelp( false, panel, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
+
+        panel:CheckBox( "Use Actual Names", "sv_npcvoicechat_userealnames" )
+        ColoredControlHelp( false, panel, "If NPCs should use their actual names instead of picking random nicknames" )
 
         panel:CheckBox( "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps" )
         ColoredControlHelp( false, panel, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
