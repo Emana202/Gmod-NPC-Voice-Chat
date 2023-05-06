@@ -80,6 +80,19 @@ local function UpdateVoiceProfiles()
 end
 UpdateVoiceProfiles()
 
+local function GetSoundSource( ent )
+    local srcEnt = ent.SoundSourceEnt
+    local netFunc = ent.GetSoundSource
+    if !IsValid( srcEnt ) then
+        if netFunc then 
+            srcEnt = netFunc( ent )
+        else
+            srcEnt = ent:GetNW2Entity( "npcsqueakers_soundsrc", NULL )
+        end
+    end
+    return srcEnt, netFunc
+end
+
 local function PlaySoundFile( sndDir, vcData, is3D )
     local ent = vcData.Emitter
     if !IsValid( ent ) then return end
@@ -100,7 +113,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
             return
         end
 
-        local srcEnt = ( ent.GetSoundSource and ent:GetSoundSource() )
+        local srcEnt = GetSoundSource( ent )
         local playPos = ( IsValid( srcEnt ) and srcEnt:GetPos() or ent:GetPos() )
         snd:SetPos( playPos )
 
@@ -156,6 +169,11 @@ net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), true )
 end )
 
+net.Receive( "npcsqueakers_setsoundsrc", function()
+    local ent = net.ReadEntity()
+    if IsValid( ent ) then ent.SoundSourceEnt = net.ReadEntity() end
+end )
+
 local function UpdateSounds()
     if #NPCVC_SoundEmitters == 0 then return end
 
@@ -168,9 +186,9 @@ local function UpdateSounds()
     for index, sndData in ipairs( NPCVC_SoundEmitters ) do
         local ent = sndData.Entity
         local snd = sndData.Sound
-        local srcEnt = ( IsValid( ent ) and ent:GetSoundSource() )
+        local srcEnt, netFunc = ( IsValid( ent ) and GetSoundSource( ent ) )
 
-        if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or ent:GetRemoveOnNoSource() and !IsValid( srcEnt ) then
+        if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or netFunc and !IsValid( srcEnt ) and ent:GetRemoveOnNoSource() then
             if IsValid( snd ) then snd:Stop() end
             table_remove( NPCVC_SoundEmitters, index )
             continue
@@ -241,7 +259,7 @@ local function DrawVoiceChat()
         local ent = vcData.Entity
         local lastPos = vcData.LastPlayPos
         if IsValid( ent ) then 
-            local srcEnt = ent:GetSoundSource()
+            local srcEnt = GetSoundSource( ent )
             if IsValid( srcEnt ) then
                 lastPos = srcEnt:GetPos()
                 vcData.LastPlayPos = lastPos
@@ -373,7 +391,7 @@ local function PopulateToolMenu()
         local clText = panel:Help( "Client-Side (User Settings):" )
         clText:SetTextColor( clientColor )
 
-        panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 1 )
+        panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 2 )
         ColoredControlHelp( true, panel, "Volume of NPCs' voices during their voicechat shenanigans" )
 
         panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
@@ -437,6 +455,9 @@ local function PopulateToolMenu()
 
         panel:CheckBox( "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps" )
         ColoredControlHelp( false, panel, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
+
+        panel:NumSlider( "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", 0, 100, 0 )
+        ColoredControlHelp( false, panel, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable" )
 
         local minPitch = panel:NumSlider( "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", 10, 100, 0 )
         ColoredControlHelp( false, panel, "The lowest pitch a NPC's voice can get upon spawning" )

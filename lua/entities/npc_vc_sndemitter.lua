@@ -5,8 +5,20 @@ ENT.Type = "anim"
 
 function ENT:SetupDataTables()
 	self:NetworkVar( "Entity", 0, "SoundSource" )
-	
     self:NetworkVar( "Bool", 0, "RemoveOnNoSource" )
+
+    -- Deranged idea that came into my head
+    if ( SERVER ) then
+        self:NetworkVarNotify( "SoundSource", function( self, name, old, new )
+            if old == new then return end
+            self:SetNW2Entity( "npcsqueakers_soundsrc", new )
+
+            net.Start( "npcsqueakers_setsoundsrc" )
+                net.WriteEntity( self )
+                net.WriteEntity( new )
+            net.Broadcast()
+        end )
+    end
 end
 
 if ( SERVER ) then

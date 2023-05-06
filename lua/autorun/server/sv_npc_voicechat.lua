@@ -67,6 +67,7 @@ NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
+util.AddNetworkString( "npcsqueakers_setsoundsrc" )
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
@@ -161,6 +162,7 @@ local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min"
 local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 100, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeathPanic  = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines", 0, 1 )
+local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
 
 local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
@@ -248,7 +250,7 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     local pfpBgClr = npc.NPCVC_PfpBackgroundColor
     if pfpBgClr then vcData.PfpBackgroundColor = pfpBgClr end
 
-    local playDelay = ( ( IsSinglePlayer() and !isInput ) and 0 or 0.1 )
+    local playDelay = ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 )
     if vcSlightDelay:GetBool() then playDelay = ( random( ( playDelay * 10 ), 5 ) / 10 ) end
     SimpleTimer( playDelay, function()
         net.Start( "npcsqueakers_playsound" )
@@ -298,21 +300,25 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if attacker == npc then
-            if vcAllowLines_KillEnemy:GetBool() and npc:GetEnemy() == ent then
+            if vcAllowLines_KillEnemy:GetBool() and npc.NPCVC_LastValidEnemy == ent then
                 PlaySoundFile( npc, ( random( 1, 6 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
-        elseif attackPos and npc:Disposition( attacker ) != D_HT and vcAllowLines_Assist:GetBool() and ( attackPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( attacker ) ) then
-            local isEnemy = ( npc:GetEnemy() == ent )
-            if !isEnemy and npc:IsNPC() then
-                for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
-                    isEnemy = ( knownEne == ent )
-                    if isEnemy then break end
+        elseif attackPos then 
+            if attacker == ent then
+                PlaySoundFile( npc, "laugh" )
+            elseif npc:Disposition( attacker ) != D_HT and vcAllowLines_Assist:GetBool() and ( attackPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( attacker ) ) then
+                local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
+                if !isEnemy and npc:IsNPC() then
+                    for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
+                        isEnemy = ( knownEne == ent )
+                        if isEnemy then break end
+                    end
                 end
-            end
-            if isEnemy then
-                PlaySoundFile( npc, "assist" )
-                continue
+                if isEnemy then
+                    PlaySoundFile( npc, "assist" )
+                    continue
+                end
             end
         end
     end
@@ -327,6 +333,7 @@ local function OnEntityCreated( npc )
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
+        npc.NPCVC_LastValidEnemy = NULL
         npc.NPCVC_IsLowHealth = false
         npc.NPCVC_WasOnFire = false
         npc.NPCVC_IsSelfDestructing = false
@@ -349,7 +356,8 @@ local function OnEntityCreated( npc )
         end
 
         if !npc.NPCVC_IsDuplicated then
-            local speechChance = random( 0, 100 )
+            local speechChance = vcForceSpeechChance:GetInt()
+            if speechChance == 0 then speechChance = random( 0, 100 ) end
             npc.NPCVC_SpeechChance = speechChance
             
             local voicePitch = random( vcPitchMin:GetInt(), vcPitchMax:GetInt() )
@@ -627,7 +635,8 @@ local function OnServerThink()
             end
 
             npc.NPCVC_LastEnemy = curEnemy
-            
+            if IsValid( curEnemy ) then npc.NPCVC_LastValidEnemy = curEnemy end
+
             if curTime >= npc.NPCVC_NextIdleSpeak then
                 npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
             end
