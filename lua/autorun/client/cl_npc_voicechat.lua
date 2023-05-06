@@ -29,10 +29,19 @@ local surface_DrawRect = surface.DrawRect
 local surface_DrawTexturedRect = surface.DrawTexturedRect
 local End3D2D = cam.End3D2D
 local file_Find = file.Find
+local JSONToTable = util.JSONToTable
+local TableToJSON = util.TableToJSON
+local PlaySound = surface.PlaySound
+local notification_AddLegacy = notification.AddLegacy
+local vgui_Create = vgui.Create
+local list_Get = list.Get
 
 local voiceIconMat      = Material( "voice/icntlk_pl" )
 local popup_BaseClr     = Color( 255, 255, 255, 255 )
 local popup_BoxClr      = Color( 0, 255, 0, 240 )
+local clientColor       = Color( 255, 145, 0 )
+local serverColor       = Color( 0, 174, 255 )
+local npcNameBgColor    = Color( 72, 72, 72 )
 
 local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcGlobalVC        = CreateClientConVar( "cl_npcvoicechat_globalvoicechat", "0", nil, nil, "If the NPC voices can be heard globally", 0, 1 )
@@ -346,13 +355,314 @@ local function OnCreateClientsideRagdoll( owner, ragdoll )
     end )
 end
 
+------------------------------------------------------------------------------------------------------------
+
+NPCVC_CachedNPCIconMaterials = NPCVC_CachedNPCIconMaterials or {}
+
+local function OpenClassSpecificVPs( ply )
+    if !ply:IsSuperAdmin() then
+        PlaySound( "buttons/button11.wav" )
+        notification_AddLegacy( "You must be a Super Admin in order to use this!", 1, 4 )
+        return
+    end
+
+    local frame = vgui_Create( "DFrame" )
+    frame:SetSize( 800, 500 )
+    frame:SetSizable( true )
+    frame:SetTitle( "NPC-Specific Voice Profiles" )
+    frame:SetDeleteOnClose( true )
+    frame:Center()
+    frame:MakePopup()
+    
+    local label = vgui_Create( "DLabel", frame )
+    label:SetText( "Click on a NPC on the left to assign a voice profile to it. Right click a row to the right to unassign the voice profile from it" )
+    label:Dock( TOP )
+
+    local npcSelectPanel = vgui_Create( "DPanel", frame )
+    npcSelectPanel:SetSize( 430, 1 )
+    npcSelectPanel:Dock( LEFT )
+
+    local scrollPanel = vgui_Create( "DScrollPanel", npcSelectPanel )
+    scrollPanel:Dock( FILL )
+
+    local npcIconLayout = vgui_Create( "DIconLayout", scrollPanel )
+    npcIconLayout:Dock( FILL )
+    npcIconLayout:SetSpaceX( 5 )
+    npcIconLayout:SetSpaceY( 5 )
+
+    local npcListPanel = vgui_Create( "DListView", frame )
+    npcListPanel:SetSize( 350, 1 )
+    npcListPanel:DockMargin( 10, 0, 0, 0 )
+    npcListPanel:Dock( LEFT )
+    npcListPanel:AddColumn( "NPC", 1 )
+    npcListPanel:AddColumn( "Voice Profile", 2 )
+
+    local npcList = list_Get( "NPC" )
+    local changedSomething = false
+
+    local function AddNPCPanel( class )
+        for _, v in pairs( npcIconLayout:GetChildren() ) do 
+            if v:GetNPC() == class then return end 
+        end
+
+        local npcPanel = npcIconLayout:Add( "DPanel" )
+        npcPanel:SetSize( 100, 120 )
+        npcPanel:SetBackgroundColor( npcNameBgColor )
+
+        local npcImg = vgui_Create( "DImageButton", npcPanel )
+        npcImg:SetSize( 100, 100 )
+        npcImg:Dock( TOP )
+        
+        local iconMat = NPCVC_CachedNPCIconMaterials[ class ]
+        if !iconMat then
+            iconMat = Material( "entities/" .. class .. ".png" )
+            if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
+            if !iconMat:IsError() then NPCVC_CachedNPCIconMaterials[ class ] = iconMat end
+        end
+        npcImg:SetMaterial( iconMat )
+
+        local npcName = vgui_Create( "DLabel", npcPanel )
+        local prettyName = ( npcList[ class ] and npcList[ class ].Name )
+        npcName:SetText( prettyName or class )
+        npcName:Dock( TOP )
+
+        function npcImg:DoClick()
+            PlaySound( "buttons/lightswitch2.wav" )
+
+            local vpSelectFrame = vgui_Create( "DFrame" )
+            vpSelectFrame:SetSize( 300, 100 )
+            vpSelectFrame:SetSizable( true )
+            vpSelectFrame:SetTitle( "Voice Profile Assigment" )
+            vpSelectFrame:SetDeleteOnClose( true )
+            vpSelectFrame:SetBackgroundBlur( true )
+            vpSelectFrame:Center()
+            vpSelectFrame:MakePopup()
+
+            local infoLabel = vgui_Create( "DLabel", vpSelectFrame )
+            infoLabel:SetText( "Select the voice profile you want to assign to this NPC class." )
+            infoLabel:Dock( TOP )
+
+            local vpSelection = vgui_Create( "DComboBox", vpSelectFrame )
+            vpSelection:Dock( TOP )
+            vpSelection:SetValue( "None" )
+
+            vpSelection:AddChoice( "None", "" )
+            for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
+                vpSelection:AddChoice( prefix .. vp, vp )
+            end
+
+            local doneButton = vgui_Create( "DButton", vpSelectFrame )
+            doneButton:Dock( BOTTOM )
+            doneButton:SetText( "Done" )
+
+            function doneButton:DoClick()
+                local vpName, vpSelected = vpSelection:GetSelected()
+                if vpSelected and #vpSelected != 0 then 
+                    PlaySound( "buttons/button15.wav" )
+                    notification_AddLegacy( "Successfully assigned " .. prettyName .. "'s voice profile to " .. vpName .. "!", 0, 4 )
+
+                    npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), vpSelected, class )
+                    npcPanel:Remove()
+                    changedSomething = true
+                end
+
+                vpSelectFrame:Remove()
+            end
+        end
+
+        function npcPanel:GetNPC() 
+            return class 
+        end
+    end
+
+    for _, v in SortedPairsByMemberValue( npcList, "Category" ) do
+        AddNPCPanel( v.Class )
+    end
+
+    function npcListPanel:OnRowRightClick( id, line )
+        PlaySound( "buttons/combine_button3.wav" )
+        AddNPCPanel( line:GetColumnText( 3 ) )
+        self:RemoveLine( id )
+        changedSomething = true
+    end
+
+    function frame:OnClose()
+        if changedSomething then
+            PlaySound( "ambient/water/drip4.wav" )
+            notification_AddLegacy( "Make sure to update the data after this!", 3, 4 )
+        end
+
+        local classVPs = {}
+        for _, line in pairs( npcListPanel:GetLines() ) do 
+            classVPs[ line:GetColumnText( 3 ) ] = line:GetColumnText( 2 ) 
+        end
+
+        net.Start( "npcsqueakers_writedata" )
+            net.WriteString( TableToJSON( classVPs ) )
+            net.WriteString( "classvps.json" )
+        net.SendToServer()
+    end
+
+    net.Start( "npcsqueakers_requestdata" )
+        net.WriteString( "classvps.json" )
+    net.SendToServer()
+
+    net.Receive( "npcsqueakers_returndata", function()
+        local data = JSONToTable( net.ReadString() )
+        if !data then return end
+
+        for class, vp in pairs( data ) do
+            local listData = npcList[ class ]
+            if !listData then continue end
+
+            local prettyName = listData.Name
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), vp, class )
+
+            for _, npcPanel in pairs( npcIconLayout:GetChildren() ) do
+                if npcPanel:GetNPC() == class then npcPanel:Remove() break end 
+            end
+        end
+    end )
+end
+
+local function OpenNPCBlacklisting( ply )
+    if !ply:IsSuperAdmin() then
+        PlaySound( "buttons/button11.wav" )
+        notification_AddLegacy( "You must be a Super Admin in order to use this!", 1, 4 )
+        return
+    end
+
+    local frame = vgui_Create( "DFrame" )
+    frame:SetSize( 800, 500 )
+    frame:SetSizable( true )
+    frame:SetTitle( "NPC Voice Chat Blacklist" )
+    frame:SetDeleteOnClose( true )
+    frame:Center()
+    frame:MakePopup()
+    
+    local label = vgui_Create( "DLabel", frame )
+    label:SetText( "Click on a NPC on the left to blacklist it from voicechat usage. Right click a row to the right to remove it from blacklist" )
+    label:Dock( TOP )
+
+    local npcSelectPanel = vgui_Create( "DPanel", frame )
+    npcSelectPanel:SetSize( 430, 1 )
+    npcSelectPanel:Dock( LEFT )
+
+    local scrollPanel = vgui_Create( "DScrollPanel", npcSelectPanel )
+    scrollPanel:Dock( FILL )
+
+    local npcIconLayout = vgui_Create( "DIconLayout", scrollPanel )
+    npcIconLayout:Dock( FILL )
+    npcIconLayout:SetSpaceX( 5 )
+    npcIconLayout:SetSpaceY( 5 )
+
+    local npcListPanel = vgui_Create( "DListView", frame )
+    npcListPanel:SetSize( 350, 1 )
+    npcListPanel:DockMargin( 10, 0, 0, 0 )
+    npcListPanel:Dock( LEFT )
+    npcListPanel:AddColumn( "NPC", 1 )
+
+    local npcList = list_Get( "NPC" )
+    local changedSomething = false
+
+    local function AddNPCPanel( class )
+        for _, v in pairs( npcIconLayout:GetChildren() ) do 
+            if v:GetNPC() == class then return end 
+        end
+
+        local npcPanel = npcIconLayout:Add( "DPanel" )
+        npcPanel:SetSize( 100, 120 )
+        npcPanel:SetBackgroundColor( npcNameBgColor )
+
+        local npcImg = vgui_Create( "DImageButton", npcPanel )
+        npcImg:SetSize( 100, 100 )
+        npcImg:Dock( TOP )
+
+        local iconMat = NPCVC_CachedNPCIconMaterials[ class ]
+        if !iconMat then
+            iconMat = Material( "entities/" .. class .. ".png" )
+            if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
+            if !iconMat:IsError() then NPCVC_CachedNPCIconMaterials[ class ] = iconMat end
+        end
+        npcImg:SetMaterial( iconMat )
+
+        local npcName = vgui_Create( "DLabel", npcPanel )
+        local prettyName = ( npcList[ class ] and npcList[ class ].Name )
+        npcName:SetText( prettyName or class )
+        npcName:Dock( TOP )
+
+        function npcImg:DoClick()
+            PlaySound( "buttons/lightswitch2.wav" )
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
+            npcPanel:Remove()
+            changedSomething = true
+        end
+
+        function npcPanel:GetNPC() 
+            return class 
+        end
+    end
+
+    for _, v in SortedPairsByMemberValue( npcList, "Category" ) do
+        AddNPCPanel( v.Class )
+    end
+
+    function npcListPanel:OnRowRightClick( id, line )
+        PlaySound( "buttons/combine_button3.wav" )
+        AddNPCPanel( line:GetColumnText( 2 ) )
+        self:RemoveLine( id )
+        changedSomething = true
+    end
+
+    function frame:OnClose()
+        if changedSomething then
+            PlaySound( "ambient/water/drip4.wav" )
+            notification_AddLegacy( "Make sure to update the data after this!", 3, 4 )
+        end
+
+        local classes = {}
+        for _, line in pairs( npcListPanel:GetLines() ) do 
+            classes[ line:GetColumnText( 2 )  ] = true
+        end
+
+        net.Start( "npcsqueakers_writedata" )
+            net.WriteString( TableToJSON( classes ) )
+            net.WriteString( "npcblacklist.json" )
+        net.SendToServer()
+    end
+
+    net.Start( "npcsqueakers_requestdata" )
+        net.WriteString( "npcblacklist.json" )
+    net.SendToServer()
+
+    net.Receive( "npcsqueakers_returndata", function()
+        local data = JSONToTable( net.ReadString() )
+        if !data then return end
+
+        for class, vp in pairs( data ) do
+            local listData = npcList[ class ]
+            if !listData then continue end
+
+            local prettyName = listData.Name
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
+
+            for _, npcPanel in pairs( npcIconLayout:GetChildren() ) do
+                if npcPanel:GetNPC() == class then npcPanel:Remove() break end 
+            end
+        end
+    end )
+end
+
+concommand.Add( "cl_npcvoicechat_panel_npcspecificvps", OpenClassSpecificVPs )
+concommand.Add( "cl_npcvoicechat_panel_npcblacklist", OpenNPCBlacklisting )
+
+------------------------------------------------------------------------------------------------------------
+
 local function AddToolMenuTabs()
     spawnmenu.AddToolCategory( "Utilities", "YerSoMashy", "YerSoMashy" )
 end
 
 local function PopulateToolMenu()
-    local clientColor = Color( 255, 145, 0 )
-    local serverColor = Color( 0, 174, 255 )
     local function ColoredControlHelp( isClient, panel, text )
         local help = panel:ControlHelp( text )
         help:SetTextColor( isClient and clientColor or serverColor )
@@ -411,7 +721,7 @@ local function PopulateToolMenu()
         ColoredControlHelp( true, panel, "Time in seconds required for a voice popup to fully fadeout after not being used" )
 
         panel:Help( "Popup Volume Color:" )
-        local popupColor = vgui.Create( "DColorMixer", panel )
+        local popupColor = vgui_Create( "DColorMixer", panel )
         panel:AddItem( popupColor )
 
         popupColor:SetConVarR( "cl_npcvoicechat_popupcolor_r" )
@@ -437,6 +747,7 @@ local function PopulateToolMenu()
         panel:CheckBox( "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
         panel:CheckBox( "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
         panel:CheckBox( "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
+        panel:CheckBox( "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" )
         panel:Help( "------------------------------------------------------------" )
 
         panel:CheckBox( "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged" )
@@ -502,8 +813,16 @@ local function PopulateToolMenu()
         end )
 
         panel:Help( "------------------------------------------------------------" )
+        
+        panel:Button( "NPC Voice Chat Blacklist", "cl_npcvoicechat_panel_npcblacklist" )
+        ColoredControlHelp( false, panel, "Opens a panel that allows you to blacklist a specific NPC class from using voicechat." )
+
+        panel:Button( "NPC-Specific Voice Profiles", "cl_npcvoicechat_panel_npcspecificvps" )
+        ColoredControlHelp( false, panel, "Opens a panel that allows you to assign a voice profile to specific NPC class." )
+
         panel:Button( "Update Data", "sv_npcvoicechat_updatedata" )
         ColoredControlHelp( false, panel, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting. You should always do it after adding or removing stuff" )
+        
         panel:Help( "------------------------------------------------------------" )
 
         panel:Help( "You can add new voicelines, nicknames, profile pictures and etc. by doing following the steps below:" )

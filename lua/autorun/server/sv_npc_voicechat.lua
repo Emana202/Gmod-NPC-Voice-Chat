@@ -24,7 +24,8 @@ local FindInSphere = ents.FindInSphere
 local IsSinglePlayer = game.SinglePlayer
 local StoreEntityModifier = duplicator.StoreEntityModifier
 local file_Exists = file.Exists
-local file_Open = file.Open
+local file_Read = file.Read
+local file_Write = file.Write
 local file_Find = file.Find
 local JSONToTable = util.JSONToTable
 local TableToJSON = util.TableToJSON
@@ -61,16 +62,35 @@ NPCVC_NickNames         = NPCVC_NickNames or {}
 NPCVC_VoiceLines        = NPCVC_VoiceLines or {}
 NPCVC_ProfilePictures   = NPCVC_ProfilePictures or {}
 NPCVC_VoiceProfiles     = NPCVC_VoiceProfiles or {}
+NPCVC_NPCVoiceProfiles  = NPCVC_NPCVoiceProfiles or {}
+NPCVC_NPCBlacklist      = NPCVC_NPCBlacklist or {}
 NPCVC_IsInitialized     = NPCVC_IsInitialized or false
 NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
+util.AddNetworkString( "npcsqueakers_writedata" )
+util.AddNetworkString( "npcsqueakers_requestdata" )
+util.AddNetworkString( "npcsqueakers_returndata" )
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
     if IsValid( ent ) then ent.SpeechPlayTime = ( RealTime() + net.ReadFloat() ) end
+end )
+
+net.Receive( "npcsqueakers_requestdata", function( len, ply )
+    local content = file_Read( "npcvoicechat/" .. net.ReadString(), "DATA" )
+    if !content then return end
+
+    net.Start( "npcsqueakers_returndata" )
+        net.WriteString( content )
+    net.Send( ply )
+end )
+
+net.Receive( "npcsqueakers_writedata", function()
+    local data = net.ReadString()
+    if data then file_Write( "npcvoicechat/" .. net.ReadString(), data ) end
 end )
 
 duplicator.RegisterEntityModifier( "NPC VoiceChat - NPC's Voice Data", function( ply, ent, data )
@@ -108,16 +128,29 @@ end
 local function UpdateData( ply )
     if IsValid( ply ) and !ply:IsSuperAdmin() then return end
 
-    local nameTbl
-    local names = file_Open( "npcvoicechat/names.json", "r", "DATA" )
+    local names = file_Read( "npcvoicechat/names.json", "DATA" )
     if !names then
-        names = file_Open( "npcvoicechat/names.json", "w", "DATA" )
-        if names then names:Write( TableToJSON( defaultNames ) ); names:Close() end
+        NPCVC_NickNames = defaultNames
+        file_Write( "npcvoicechat/names.json", TableToJSON( defaultNames ) )
     else
-        nameTbl = names:Read( names:Size() )
-        names:Close()
+        NPCVC_NickNames = JSONToTable( names )
     end
-    NPCVC_NickNames = ( nameTbl and  JSONToTable( nameTbl ) or defaultNames )
+
+    local npcVPs = file_Read( "npcvoicechat/classvps.json", "DATA" )
+    if !npcVPs then
+        table_Empty( NPCVC_NPCVoiceProfiles )
+        file_Write( "npcvoicechat/classvps.json", TableToJSON( NPCVC_NPCVoiceProfiles ) )
+    else
+        NPCVC_NPCVoiceProfiles = JSONToTable( npcVPs )
+    end
+
+    local npcBlacklist = file_Read( "npcvoicechat/npcblacklist.json", "DATA" )
+    if !npcBlacklist then
+        table_Empty( NPCVC_NPCBlacklist )
+        file_Write( "npcvoicechat/npcblacklist.json", TableToJSON( NPCVC_NPCBlacklist ) )
+    else
+        NPCVC_NPCBlacklist = JSONToTable( npcBlacklist )
+    end
 
     table_Empty( NPCVC_VoiceLines )
     for voiceType, sndDir in pairs( voicelineDirs ) do
@@ -154,6 +187,7 @@ local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1",
 local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
 local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
+local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "1", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
@@ -213,6 +247,7 @@ end
 local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
+    if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.IsDrGNextbot and ( npc:IsPossessed() or !vcAllowDrGBase:GetBool() ) then return end
     if npc.IsVJBaseSNPC then
         if npc.VJ_IsBeingControlled or npc:GetState() != 0 or !vcAllowVJBase:GetBool() then return end
@@ -326,10 +361,10 @@ end
 
 local function OnEntityCreated( npc )
     SimpleTimer( 0, function()
-        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
+        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
 
         local npcClass = npc:GetClass()
-        if nonNPCNPCs[ npcClass ] then return end
+        if nonNPCNPCs[ npcClass ] or NPCVC_NPCBlacklist[ npcClass ] then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
@@ -389,15 +424,20 @@ local function OnEntityCreated( npc )
             npc.NPCVC_ProfilePicture = profilePic
             npc.NPCVC_PfpBackgroundColor = pfpBgClr
 
-            local cvarVoice = vcVoiceProfile:GetString()
-            local voicePfp = NPCVC_VoiceProfiles[ cvarVoice ]
-            if !voicePfp then 
-                if random( 1, 100 ) <= vcVoiceProfileChance:GetInt() then
-                    local voicePfps = table_GetKeys( NPCVC_VoiceProfiles ) 
-                    voicePfp = voicePfps[ random( #voicePfps ) ]
-                end
+            local voicePfp = NPCVC_NPCVoiceProfiles[ npcClass ]
+            if !voicePfp then
+                local cvarVoice = vcVoiceProfile:GetString()
+                voicePfp = NPCVC_VoiceProfiles[ cvarVoice ]
+                if !voicePfp then 
+                    if random( 1, 100 ) <= vcVoiceProfileChance:GetInt() then
+                        local voicePfps = table_GetKeys( NPCVC_VoiceProfiles ) 
+                        voicePfp = voicePfps[ random( #voicePfps ) ]
+                    end
+                else
+                    voicePfp = cvarVoice
+                    npc.NPCVC_IsVoiceProfileServerside = true
+                end    
             else
-                voicePfp = cvarVoice
                 npc.NPCVC_IsVoiceProfileServerside = true
             end
             npc.NPCVC_VoiceProfile = voicePfp
@@ -562,7 +602,7 @@ local function OnServerThink()
                     curEnemy = npc:GetEnemy()
                     local lastEnemy = npc.NPCVC_LastEnemy
                     local isPanicking = ( npc.NPCVC_WasOnFire or !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
-                    if npc.IsVJBaseSNPC or npc.IsDrGNextbot or npcClass == "npc_barnacle" then
+                    if npc.IsVJBaseSNPC or npc.IsDrGNextbot or npc.SBAdvancedNextBot or npcClass == "npc_barnacle" then
                         if rolledSpeech then
                             if !isPanicking then
                                 isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
@@ -650,19 +690,28 @@ local function OnServerThink()
 end
 
 local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
-    if !tookDamage or !ent.NPCVC_Initialized or ent.NPCVC_IsLowHealth then return end
+    if !tookDamage or !ent.NPCVC_Initialized then return end
+    local playPanicSnd = false
 
-    local hpThreshold = Rand( 0.2, 0.5 )
-    if ent:Health() > ( ent:GetMaxHealth() * hpThreshold ) then return end
+    if !ent.NPCVC_IsLowHealth then
+        local hpThreshold = Rand( 0.2, 0.5 )
+        if ent:Health() <= ( ent:GetMaxHealth() * hpThreshold ) then
+            playPanicSnd = true
+            ent.NPCVC_IsLowHealth = hpThreshold
+        end
+    end
 
-    ent.NPCVC_IsLowHealth = hpThreshold
-    if random( 1, 100 ) > ent.NPCVC_SpeechChance then return end
+    if !IsSpeaking( ent, "panic" ) and dmginfo:GetDamage() >= ( ent:GetMaxHealth() / random( 2, 3 ) ) then
+        playPanicSnd = true
+    end
 
-    SimpleTimer( 0.1, function()
-        if !IsValid( ent ) or ent:GetInternalVariable( "m_lifeState" ) != 0 then return end
-        if !vcAllowLines_LowHealth:GetBool() then return end
-        PlaySoundFile( ent, "panic" )
-    end )
+    if playPanicSnd and random( 1, 100 ) <= ent.NPCVC_SpeechChance then 
+        SimpleTimer( 0.1, function()
+            if !IsValid( ent ) or ent:GetInternalVariable( "m_lifeState" ) != 0 then return end
+            if !vcAllowLines_LowHealth:GetBool() then return end
+            PlaySoundFile( ent, "panic" )
+        end )
+    end
 end
 
 local function OnAcceptInput( ent, input, activator, caller, value )
