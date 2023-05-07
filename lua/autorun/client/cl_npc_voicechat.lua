@@ -142,7 +142,9 @@ local function PlaySoundFile( sndDir, vcData, is3D )
         local entIndex = vcData.EntIndex
         local voicePopup = NPCVC_VoicePopups[ entIndex ]
         if voicePopup then 
+            voicePopup.Entity = ent
             voicePopup.Sound = snd
+            voicePopup.LastPlayPos = playPos
         else
             local pfpPic = vcData.ProfilePicture
             if pfpPic then
