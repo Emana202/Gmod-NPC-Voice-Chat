@@ -46,9 +46,9 @@ local npcNameBgColor    = Color( 72, 72, 72 )
 local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcGlobalVC        = CreateClientConVar( "cl_npcvoicechat_globalvoicechat", "0", nil, nil, "If the NPC voices can be heard globally", 0, 1 )
 local vcPlayVol         = CreateClientConVar( "cl_npcvoicechat_playvolume", "1", nil, nil, "The sound volume of NPC voices", 0 )
-local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "300", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
+local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "250", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
 local vcShowIcon        = CreateClientConVar( "cl_npcvoicechat_showvoiceicon", "1", nil, nil, "If a voice icon should appear above NPC while they're speaking?", 0, 1 )
-local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "0", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
+local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "1", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
 local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "0", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
 local vcPopupDrawPfp    = CreateClientConVar( "cl_npcvoicechat_popupdrawpfp", "1", nil, nil, "If the NPC's voice popup should draw its profile picture", 0, 1 )
@@ -357,7 +357,9 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-NPCVC_CachedNPCIconMaterials = NPCVC_CachedNPCIconMaterials or {}
+NPCVC_ClientSettings            = NPCVC_ClientSettings or {}
+NPCVC_ServerSettings            = NPCVC_ServerSettings or {}
+NPCVC_CachedNPCIconMaterials    = NPCVC_CachedNPCIconMaterials or {}
 
 local function OpenClassSpecificVPs( ply )
     if !ply:IsSuperAdmin() then
@@ -417,9 +419,11 @@ local function OpenClassSpecificVPs( ply )
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
-            if !iconMat:IsError() then NPCVC_CachedNPCIconMaterials[ class ] = iconMat end
         end
-        npcImg:SetMaterial( iconMat )
+        if iconMat != false and !iconMat:IsError() then 
+            npcImg:SetMaterial( iconMat )
+        end
+        NPCVC_CachedNPCIconMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -582,9 +586,11 @@ local function OpenNPCBlacklisting( ply )
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
-            if !iconMat:IsError() then NPCVC_CachedNPCIconMaterials[ class ] = iconMat end
         end
-        npcImg:SetMaterial( iconMat )
+        if iconMat != false and !iconMat:IsError() then 
+            npcImg:SetMaterial( iconMat )
+        end
+        NPCVC_CachedNPCIconMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -653,8 +659,25 @@ local function OpenNPCBlacklisting( ply )
     end )
 end
 
+local function ResetClientSettings( ply )
+    for _, cvar in pairs( NPCVC_ClientSettings ) do cvar:SetString( cvar:GetDefault() ) end
+end
+
+local function ResetServerSettings( ply )
+    if !ply:IsSuperAdmin() then return end
+
+    net.Start( "npcsqueakers_resetsettings" )
+        net.WriteUInt( table.Count( NPCVC_ServerSettings ), 6 )
+        for cvarName, _ in pairs( NPCVC_ServerSettings ) do
+            net.WriteString( cvarName )
+        end
+    net.SendToServer()
+end
+
 concommand.Add( "cl_npcvoicechat_panel_npcspecificvps", OpenClassSpecificVPs )
 concommand.Add( "cl_npcvoicechat_panel_npcblacklist", OpenNPCBlacklisting )
+concommand.Add( "cl_npcvoicechat_resetsettings", ResetClientSettings )
+concommand.Add( "sv_npcvoicechat_resetsettings", ResetServerSettings )
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -689,44 +712,70 @@ local function PopulateToolMenu()
         return comboBox
     end
 
+    local function AddSettingsPanel( panel, client, type, label, convar, helpText, addArgs )
+        addArgs = addArgs or {}
+
+        local setting
+        if type == "NumSlider" then
+            setting = panel:NumSlider( label, convar, addArgs.min or 0, addArgs.max or 1, addArgs.decimals or 0 )
+        elseif type == "CheckBox" then
+            setting = panel:CheckBox( label, convar )
+        end
+        if helpText then ColoredControlHelp( client, panel, helpText ) end
+
+        local cvar = GetConVar( convar )
+        if client then
+            NPCVC_ClientSettings[ convar ] = cvar
+        else
+            NPCVC_ServerSettings[ convar ] = cvar
+        end
+
+        return setting
+    end
+
     spawnmenu.AddToolMenuOption( "Utilities", "YerSoMashy", "NPCSqueakersMenu", "NPC Voice Chat", "", "", function( panel ) 
         local clText = panel:Help( "Client-Side (User Settings):" )
         clText:SetTextColor( clientColor )
 
-        panel:NumSlider( "Voice Volume", "cl_npcvoicechat_playvolume", 0, 4, 2 )
-        ColoredControlHelp( true, panel, "Volume of NPCs' voices during their voicechat shenanigans" )
+        panel:Button( "Reset To Default", "cl_npcvoicechat_resetsettings" )
 
-        panel:NumSlider( "Max Volume Range", "cl_npcvoicechat_playdistance", 0, 2000, 0 )
-        ColoredControlHelp( true, panel, "How close should you be to the NPC for its voiceline's volume to reach maximum possible value" )
+        AddSettingsPanel( panel, true, "NumSlider", "Voice Volume", "cl_npcvoicechat_playvolume", "Controls the volume of NPC's voices during their voicechat speech", {
+            max = 4,
+            decimals = 2
+        } )
+        AddSettingsPanel( panel, true, "NumSlider", "Max Volume Range", "cl_npcvoicechat_playdistance", "How close should you be to the NPC for its voiceline's volume to reach maximum possible volume value", {
+            max = 2000
+        } )
 
         local clVoicePfps = GetComboBoxVoiceProfiles( panel, false, "cl_npcvoicechat_spawnvoiceprofile" )
+        NPCVC_ClientSettings[ #NPCVC_ClientSettings + 1 ] = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
-        panel:CheckBox( "Global Voice Chat", "cl_npcvoicechat_globalvoicechat" )
-        ColoredControlHelp( true, panel, "If NPC's voice chat can be heard globally and not in 3D" )
+        AddSettingsPanel( panel, true, "CheckBox", "Global Voice Chat", "cl_npcvoicechat_globalvoicechat", "If NPC's voice chat can be heard globally and not in 3D" )
+        AddSettingsPanel( panel, true, "CheckBox", "Display Voice Icon", "cl_npcvoicechat_showvoiceicon", "If a voice icon should appear above NPC while they're speaking or using voicechat" )
+        AddSettingsPanel( panel, true, "CheckBox", "Display Voice Popups", "cl_npcvoicechat_showpopups", "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
+        AddSettingsPanel( panel, true, "CheckBox", "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp", "If the NPC's voice popup should draw its profile picture" )
 
-        panel:CheckBox( "Display Voice Icon", "cl_npcvoicechat_showvoiceicon" )
-        ColoredControlHelp( true, panel, "If a voice icon should appear above NPC while they're speaking or using voicechat" )
-
-        panel:CheckBox( "Display Voice Popups", "cl_npcvoicechat_showpopups" )
-        ColoredControlHelp( true, panel, "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
-
-        panel:CheckBox( "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp" )
-        ColoredControlHelp( true, panel, "If the NPC's voice popup should draw its profile picture" )
-
-        panel:NumSlider( "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", 0, 2000, 0 )
-        ColoredControlHelp( true, panel, "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range" )
-
-        panel:NumSlider( "Popup Fadeout Time", "cl_npcvoicechat_popupfadetime", 0, 10, 1 )
-        ColoredControlHelp( true, panel, "Time in seconds required for a voice popup to fully fadeout after not being used" )
+        AddSettingsPanel( panel, true, "NumSlider", "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range", {
+            max = 2000
+        } )
+        AddSettingsPanel( panel, true, "NumSlider", "Popup Fadeout Time", "cl_npcvoicechat_popupfadetime", "Time in seconds required for a voice popup to fully fadeout after not being used", {
+            max = 10,
+            decimals = 1
+        } )
 
         panel:Help( "Popup Volume Color:" )
         local popupColor = vgui_Create( "DColorMixer", panel )
         panel:AddItem( popupColor )
 
         popupColor:SetConVarR( "cl_npcvoicechat_popupcolor_r" )
+        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_r" ] = GetConVar( "cl_npcvoicechat_popupcolor_r" )
+
         popupColor:SetConVarG( "cl_npcvoicechat_popupcolor_g" )
+        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_g" ] = GetConVar( "cl_npcvoicechat_popupcolor_g" )
+
         popupColor:SetConVarB( "cl_npcvoicechat_popupcolor_b" )
+        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_b" ] = GetConVar( "cl_npcvoicechat_popupcolor_b" )
 
         ColoredControlHelp( true, panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
 
@@ -739,37 +788,35 @@ local function PopulateToolMenu()
         local svText = panel:Help( "Server-Side (Admin Settings):" )
         svText:SetTextColor( serverColor )
 
-        panel:CheckBox( "Enable NPC Voice Chat", "sv_npcvoicechat_enabled" )
-        ColoredControlHelp( false, panel, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines" )
+        panel:Button( "Reset To Default", "sv_npcvoicechat_resetsettings" )
+
+        AddSettingsPanel( panel, false, "CheckBox", "Enable NPC Voice Chat", "sv_npcvoicechat_enabled", "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines" )
 
         panel:Help( "NPC Type Toggles:" )
-        panel:CheckBox( "Standart NPCs", "sv_npcvoicechat_allownpc" )
-        panel:CheckBox( "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
-        panel:CheckBox( "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
-        panel:CheckBox( "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
-        panel:CheckBox( "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" )
+        AddSettingsPanel( panel, false, "CheckBox", "Standard NPCs", "sv_npcvoicechat_allownpc" )
+        AddSettingsPanel( panel, false, "CheckBox", "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
+        AddSettingsPanel( panel, false, "CheckBox", "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
+        AddSettingsPanel( panel, false, "CheckBox", "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
+        AddSettingsPanel( panel, false, "CheckBox", "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" )
         panel:Help( "------------------------------------------------------------" )
 
-        panel:CheckBox( "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged" )
-        ColoredControlHelp( false, panel, "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
+        AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
+        AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
+        AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
+        AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
 
-        panel:CheckBox( "Slightly Delay Playing", "sv_npcvoicechat_slightdelay" )
-        ColoredControlHelp( false, panel, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
+        AddSettingsPanel( panel, false, "NumSlider", "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", {
+            max = 100
+        } )
 
-        panel:CheckBox( "Use Actual Names", "sv_npcvoicechat_userealnames" )
-        ColoredControlHelp( false, panel, "If NPCs should use their actual names instead of picking random nicknames" )
-
-        panel:CheckBox( "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps" )
-        ColoredControlHelp( false, panel, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
-
-        panel:NumSlider( "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", 0, 100, 0 )
-        ColoredControlHelp( false, panel, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable" )
-
-        local minPitch = panel:NumSlider( "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", 10, 100, 0 )
-        ColoredControlHelp( false, panel, "The lowest pitch a NPC's voice can get upon spawning" )
-       
-        local maxPitch = panel:NumSlider( "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", 100, 255, 0 )
-        ColoredControlHelp( false, panel, "The highest pitch a NPC's voice can get upon spawning" )
+        local minPitch = AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
+            min = 10,
+            max = 100
+        } )
+        local maxPitch = AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
+            min = 100,
+            max = 255
+        } )
 
         function minPitch:OnValueChanged( value )
             maxPitch:SetMin( value )
@@ -777,34 +824,27 @@ local function PopulateToolMenu()
         function maxPitch:OnValueChanged( value )
             minPitch:SetMax( value )
         end
-
-        panel:NumSlider( "Speak Limit", "sv_npcvoicechat_speaklimit", 0, 15, 0 )
-        ColoredControlHelp( false, panel, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable" )
-
-        panel:CheckBox( "Limit Doesn't Affect Death and Panic", "sv_npcvoicechat_speaklimit_dontaffectdeathpanic" )
-        ColoredControlHelp( false, panel, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines" )
+        
+        AddSettingsPanel( panel, false, "NumSlider", "Speak Limit", "sv_npcvoicechat_speaklimit", "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", {
+            max = 25
+        } )
+        AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death and Panic", "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines" )
 
         if LambdaVoiceProfiles then
             panel:Help( "Lambda-Related Stuff:" )
-
-            panel:CheckBox( "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines" )
-            ColoredControlHelp( false, panel, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
-
-            panel:CheckBox( "Use Lambda Players Profile Pictures", "sv_npcvoicechat_uselambdapfppics" )
-            ColoredControlHelp( false, panel, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
-            
-            panel:CheckBox( "Use Lambda Players Nicknames", "sv_npcvoicechat_uselambdanames" )
-            ColoredControlHelp( false, panel, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
+            AddSettingsPanel( panel, false, "CheckBox", "Use Lambda Players Nicknames", "sv_npcvoicechat_uselambdanames", "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
+            AddSettingsPanel( panel, false, "CheckBox", "Use Lambda Players Voicelines", "sv_npcvoicechat_uselambdavoicelines", "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
+            AddSettingsPanel( panel, false, "CheckBox", "Use Lambda Players Profile Pictures", "sv_npcvoicechat_uselambdapfppics", "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
         end
 
         local svVoicePfps = GetComboBoxVoiceProfiles( panel, false, "sv_npcvoicechat_spawnvoiceprofile" )
+        NPCVC_ServerSettings[ "sv_npcvoicechat_spawnvoiceprofile" ] = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 
-        panel:NumSlider( "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", 0, 100, 0 )
-        ColoredControlHelp( false, panel, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
-
-        panel:CheckBox( "Enable Profile Fallback", "sv_npcvoicechat_voiceprofilefallbacks" )
-        ColoredControlHelp( false, panel, "If NPC with a voice profile should fallback to standart voicelines instead of playing nothing if its profile doesn't have a specified voice type in it" )
+        AddSettingsPanel( panel, false, "NumSlider", "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn", {
+            max = 100
+        } )
+        AddSettingsPanel( panel, false, "CheckBox", "Enable Profile Fallback", "sv_npcvoicechat_voiceprofilefallbacks", "If NPC with a voice profile should fallback to standard voicelines instead of playing nothing if its profile doesn't have a specified voice type in it" )
 
         net.Receive( "npcsqueakers_updatespawnmenu", function()
             UpdateVoiceProfiles()
@@ -838,16 +878,16 @@ local function PopulateToolMenu()
         panel:Help( "------------------------------------------------------------" )
 
         panel:Help( "Voiceline Type Toggles:" )
-        panel:CheckBox( "Idling", "sv_npcvoicechat_allowlines_idle" )
-        panel:CheckBox( "In-Combat Idling", "sv_npcvoicechat_allowlines_combatidle" )
-        panel:CheckBox( "Death", "sv_npcvoicechat_allowlines_death" )
-        panel:CheckBox( "Spot Enemy", "sv_npcvoicechat_allowlines_spotenemy" )
-        panel:CheckBox( "Kill Enemy", "sv_npcvoicechat_allowlines_killenemy" )
-        panel:CheckBox( "Ally Death", "sv_npcvoicechat_allowlines_allydeath" )
-        panel:CheckBox( "Assisted", "sv_npcvoicechat_allowlines_assist" )
-        panel:CheckBox( "Spot Danger", "sv_npcvoicechat_allowlines_spotdanger" )
-        panel:CheckBox( "Catch On Fire", "sv_npcvoicechat_allowlines_catchonfire" )
-        panel:CheckBox( "Low On Health", "sv_npcvoicechat_allowlines_lowhealth" )
+        AddSettingsPanel( panel, false, "CheckBox", "Idling", "sv_npcvoicechat_allowlines_idle" )
+        AddSettingsPanel( panel, false, "CheckBox", "In-Combat Idling", "sv_npcvoicechat_allowlines_combatidle" )
+        AddSettingsPanel( panel, false, "CheckBox", "Death", "sv_npcvoicechat_allowlines_death" )
+        AddSettingsPanel( panel, false, "CheckBox", "Spot Enemy", "sv_npcvoicechat_allowlines_spotenemy" )
+        AddSettingsPanel( panel, false, "CheckBox", "Kill Enemy", "sv_npcvoicechat_allowlines_killenemy" )
+        AddSettingsPanel( panel, false, "CheckBox", "Ally Death", "sv_npcvoicechat_allowlines_allydeath" )
+        AddSettingsPanel( panel, false, "CheckBox", "Assisted", "sv_npcvoicechat_allowlines_assist" )
+        AddSettingsPanel( panel, false, "CheckBox", "Spot Danger", "sv_npcvoicechat_allowlines_spotdanger" )
+        AddSettingsPanel( panel, false, "CheckBox", "Catch On Fire", "sv_npcvoicechat_allowlines_catchonfire" )
+        AddSettingsPanel( panel, false, "CheckBox", "Low On Health", "sv_npcvoicechat_allowlines_lowhealth" )
         panel:Help( "" )
     end )
 end

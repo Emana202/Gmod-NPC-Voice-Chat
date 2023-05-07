@@ -70,6 +70,7 @@ NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
 util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
+util.AddNetworkString( "npcsqueakers_resetsettings" )
 util.AddNetworkString( "npcsqueakers_writedata" )
 util.AddNetworkString( "npcsqueakers_requestdata" )
 util.AddNetworkString( "npcsqueakers_returndata" )
@@ -77,6 +78,15 @@ util.AddNetworkString( "npcsqueakers_returndata" )
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
     if IsValid( ent ) then ent.SpeechPlayTime = ( RealTime() + net.ReadFloat() ) end
+end )
+
+net.Receive( "npcsqueakers_resetsettings", function()
+    local cvarCount = net.ReadUInt( 6 )
+    for i = 1, cvarCount do
+        local cvarName = net.ReadString()
+        local convar = GetConVar( cvarName )
+        convar:SetString( convar:GetDefault() )
+    end
 end )
 
 net.Receive( "npcsqueakers_requestdata", function( len, ply )
@@ -183,7 +193,7 @@ end
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
 
 local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
-local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standart NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
+local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standard NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
 local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
 local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
@@ -192,8 +202,8 @@ local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps",
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "0", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
-local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 10, 100 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 100, 255 )
+local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeathPanic  = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines", 0, 1 )
 local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
@@ -245,7 +255,7 @@ local function GetVoiceLine( ent, voiceType )
 end
 
 local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
-    if !npc.NPCVC_Initialized then return end
+    if !npc.NPCVC_Initialized or NPCVC_NPCBlacklist[ npc:GetClass() ] then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.IsDrGNextbot and ( npc:IsPossessed() or !vcAllowDrGBase:GetBool() ) then return end
@@ -364,7 +374,7 @@ local function OnEntityCreated( npc )
         if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
 
         local npcClass = npc:GetClass()
-        if nonNPCNPCs[ npcClass ] or NPCVC_NPCBlacklist[ npcClass ] then return end
+        if nonNPCNPCs[ npcClass ] then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
@@ -528,11 +538,11 @@ local function OnServerThink()
                 local curState = npc:GetNPCState()
                 local lastState = npc.NPCVC_LastState
                 if curState != lastState then
-                    if lastState == NPC_STATE_DEAD then
+                    if lastState == NPC_STATE_DEAD and npc:IsPlayerHolding() and vcAllowLines_Assist:GetBool() then
                         PlaySoundFile( npc, "assist" )
-                    elseif curState == NPC_STATE_DEAD then
+                    elseif curState == NPC_STATE_DEAD and vcAllowLines_SpotDanger:GetBool() then
                         PlaySoundFile( npc, "panic" )
-                    elseif curState == NPC_STATE_COMBAT then
+                    elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() then
                         PlaySoundFile( npc, "taunt" )
                     end
                 end
@@ -540,7 +550,7 @@ local function OnServerThink()
 
                 local curEnemy = npc:GetEnemy()
                 local lastEnemy = npc.NPCVC_LastEnemy
-                if curEnemy != lastEnemy and IsValid( curEnemy ) then
+                if curEnemy != lastEnemy and IsValid( curEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
                     PlaySoundFile( npc, "taunt" )
                 end
                 npc.NPCVC_LastEnemy = curEnemy
