@@ -683,6 +683,9 @@ concommand.Add( "sv_npcvoicechat_resetsettings", ResetServerSettings )
 
 ------------------------------------------------------------------------------------------------------------
 
+-- There might be a better way to do this, but this also should work
+local sbNextbotsInstalled = file.Exists( "entities/sb_advanced_nextbot_soldier_base.lua", "LUA" )
+
 local function AddToolMenuTabs()
     spawnmenu.AddToolCategory( "Utilities", "YerSoMashy", "YerSoMashy" )
 end
@@ -796,10 +799,11 @@ local function PopulateToolMenu()
 
         panel:Help( "NPC Type Toggles:" )
         AddSettingsPanel( panel, false, "CheckBox", "Standard NPCs", "sv_npcvoicechat_allownpc" )
-        AddSettingsPanel( panel, false, "CheckBox", "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" )
-        AddSettingsPanel( panel, false, "CheckBox", "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" )
+        if VJBASE_VERSION then AddSettingsPanel( panel, false, "CheckBox", "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" ) end
+        if DrGBase then AddSettingsPanel( panel, false, "CheckBox", "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" ) end
         AddSettingsPanel( panel, false, "CheckBox", "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
-        AddSettingsPanel( panel, false, "CheckBox", "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" )
+        if sbNextbotsInstalled then AddSettingsPanel( panel, false, "CheckBox", "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" ) end
+        if TF2AIHats and TF2AIWeapons then AddSettingsPanel( panel, false, "CheckBox", "Team Fortress 2 Bots", "sv_npcvoicechat_allowtf2bots" ) end
         panel:Help( "------------------------------------------------------------" )
 
         AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )

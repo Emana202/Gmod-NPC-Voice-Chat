@@ -225,6 +225,7 @@ local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "
 local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
+local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "1", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
@@ -253,7 +254,7 @@ local vcAllowLines_SpotDanger   = CreateConVar( "sv_npcvoicechat_allowlines_spot
 local vcAllowLines_CatchOnFire  = CreateConVar( "sv_npcvoicechat_allowlines_catchonfire", "1", cvarFlag, "If NPCs are allowed to play voicelines when they catch on fire.", 0, 1 )
 local vcAllowLines_LowHealth    = CreateConVar( "sv_npcvoicechat_allowlines_lowhealth", "1", cvarFlag, "If NPCs are allowed to play voicelines when they are low on health.", 0, 1 )
 
-local nextbotMETA = FindMetaTable("NextBot")
+local nextbotMETA = FindMetaTable( "NextBot" )
 NPCVC_OldFunc_BecomeRagdoll = NPCVC_OldFunc_BecomeRagdoll or nextbotMETA.BecomeRagdoll
 
 function nextbotMETA:BecomeRagdoll( dmginfo )
@@ -285,6 +286,7 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized or NPCVC_NPCBlacklist[ npc:GetClass() ] then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
+    if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
     if npc.IsDrGNextbot and ( npc:IsPossessed() or !vcAllowDrGBase:GetBool() ) then return end
     if npc.IsVJBaseSNPC then
         if npc.VJ_IsBeingControlled or npc:GetState() != 0 or !vcAllowVJBase:GetBool() then return end
@@ -355,6 +357,19 @@ local function GetAvailableNickname()
     return ( rndName and rndName or nameListTbl[ random( #nameListTbl ) ] )
 end
 
+local function GetNPCEnemy( npc )
+    return ( !npc.MNG_TF2Bot and npc:GetEnemy() or npc:GetTarget() )
+end
+
+local tf2BotsDispTranslation = {
+    [ "neutral" ] = D_NU,
+    [ "foe" ] = D_HT,
+    [ "friend" ] = D_LI
+}
+local function GetNPCDisposition( npc, target )
+    return ( npc.MNG_TF2Bot and ( tf2BotsDispTranslation[ npc:FriendOrFoe( target ) ] or D_NU ) or npc:Disposition( target ) )
+end
+
 local function CheckNearbyNPCOnDeath( ent, attacker )
     local entPos = ent:GetPos()
 
@@ -366,7 +381,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
         if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or npc.LastPathingInfraction or random( 1, 100 ) > npc.NPCVC_SpeechChance or IsSpeaking( npc ) then continue end
 
-        if npc:Disposition( ent ) == D_LI and vcAllowLines_AllyDeath:GetBool() and ( entPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( ent ) ) then
+        if GetNPCDisposition( npc, ent ) == D_LI and vcAllowLines_AllyDeath:GetBool() and ( entPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( ent ) ) then
             PlaySoundFile( npc, ( random( 1, 3 ) == 1 and "panic" or "witness" ) )
             continue
         end
@@ -379,7 +394,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         elseif attackPos then 
             if attacker == ent then
                 PlaySoundFile( npc, "laugh" )
-            elseif npc:Disposition( attacker ) != D_HT and vcAllowLines_Assist:GetBool() and ( attackPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( attacker ) ) then
+            elseif GetNPCDisposition( npc, attacker ) != D_HT and vcAllowLines_Assist:GetBool() and ( attackPos:DistToSqr( npc:GetPos() ) <= 90000 or npc:Visible( attacker ) ) then
                 local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
                 if !isEnemy and npc:IsNPC() then
                     for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
@@ -398,7 +413,7 @@ end
 
 local function OnEntityCreated( npc )
     SimpleTimer( 0, function()
-        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
+        if !IsValid( npc ) or npc.NPCVC_Initialized or !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.LastPathingInfraction and !npc:IsNPC() then return end
 
         local npcClass = npc:GetClass()
         if nonNPCNPCs[ npcClass ] then return end
@@ -668,7 +683,7 @@ local function OnServerThink()
                         npc.NPCVC_IsLowHealth = false
                     end
 
-                    curEnemy = npc:GetEnemy()
+                    curEnemy = GetNPCEnemy( npc )
                     local lastEnemy = npc.NPCVC_LastEnemy
                     local isPanicking = ( npc.NPCVC_WasOnFire or !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
 
@@ -680,7 +695,7 @@ local function OnServerThink()
                             npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
                         elseif rolledSpeech then
                             if !isPanicking then
-                                isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or !unfearableNPCs[ curEnemy:GetClass() ] and npc:Disposition( curEnemy ) == D_FR ) )
+                                isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or !unfearableNPCs[ curEnemy:GetClass() ] and GetNPCDisposition( npc, curEnemy ) == D_FR ) )
                             end
 
                             local spotLine = ( ( !isPanicking and ( !lowHP or random( 1, 4 ) != 1 ) ) and "taunt" or "panic" )                            
