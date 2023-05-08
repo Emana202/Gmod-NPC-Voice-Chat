@@ -673,15 +673,17 @@ local function OnServerThink()
             elseif !npc.NPCVC_InPanicState then
                 npc.NPCVC_InPanicState = true
 
-                SimpleTimer( Rand( 0.8, 1.25 ), function()
-                    if !IsValid( npc ) then return end
-                    PlaySoundFile( npc, "panic" )
-                end )
+                if vcAllowLines_PanicCond:GetBool() then
+                    SimpleTimer( Rand( 0.8, 1.25 ), function()
+                        if !IsValid( npc ) then return end
+                        PlaySoundFile( npc, "panic" )
+                    end )
 
-                SimpleTimer( Rand( 2, 3.5 ), function()
-                    if !IsValid( npc ) then return end
-                    PlaySoundFile( npc, "death" )
-                end )
+                    SimpleTimer( Rand( 2, 3.5 ), function()
+                        if !IsValid( npc ) then return end
+                        PlaySoundFile( npc, "death" )
+                    end )
+                end
             end
         elseif npcClass == "npc_combine_camera" then
             if npc:GetInternalVariable( "m_takedamage" ) == 2 then
@@ -690,17 +692,17 @@ local function OnServerThink()
                 local isAngry = npc:GetInternalVariable( "m_bAngry" )
 
                 if lookTarget != lastTarget and IsValid( lookTarget ) or isAngry and isAngry != npc.NPCVC_LastState then 
-                    if isAngry then
+                    if isAngry and vcAllowLines_CombatIdle:GetBool() then
                         PlaySoundFile( npc, "taunt" )
-                    else
+                    elseif vcAllowLines_Idle:GetBool() then
                         PlaySoundFile( npc, "idle" )
                     end
                 end
 
                 if npc:GetInternalVariable( "m_bActive" ) and IsValid( lookTarget ) and curTime >= npc.NPCVC_NextIdleSpeak and random( 1, 100 ) <= npc.NPCVC_SpeechChance and !IsSpeaking( npc ) then
-                    if IsValid( lookTarget ) and isAngry then
+                    if IsValid( lookTarget ) and isAngry and vcAllowLines_CombatIdle:GetBool() then
                         PlaySoundFile( npc, "taunt" )
-                    else
+                    elseif vcAllowLines_Idle:GetBool() then
                         PlaySoundFile( npc, "idle" )
                     end
                 end
@@ -713,7 +715,9 @@ local function OnServerThink()
                 npc.NPCVC_LastState = isAngry
             elseif npc.NPCVC_LastState != -1 then
                 npc.NPCVC_LastState = -1
-                PlaySoundFile( npc, "death" )
+                if vcAllowLines_Death:GetBool() then
+                    PlaySoundFile( npc, "death" )
+                end
             end
         else
             local curEnemy
@@ -747,7 +751,7 @@ local function OnServerThink()
             else
                 local lifeState = npc:GetInternalVariable( "m_lifeState" )
                 if lifeState != 0 and ( npcClass == "npc_combinegunship" or npcClass == "npc_helicopter" ) then
-                    if !IsSpeaking( npc, "death" ) then
+                    if !IsSpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
                         PlaySoundFile( npc, "death", true )
                     end
                 elseif lifeState == 0 then
@@ -798,9 +802,9 @@ local function OnServerThink()
                         if rolledSpeech and npc.NPCVC_InPanicState then
                             StopSpeaking( npc, "panic" )
 
-                            if IsValid( curEnemy ) then
+                            if IsValid( curEnemy ) and vcAllowLines_CombatIdle:GetBool() then
                                 PlaySoundFile( npc, "taunt" )
-                            else
+                            elseif vcAllowLines_Idle:GetBool() then
                                 PlaySoundFile( npc, "witness" )
                             end
                         end
