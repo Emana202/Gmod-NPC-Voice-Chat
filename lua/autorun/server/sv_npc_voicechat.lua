@@ -13,6 +13,7 @@ local RealTime = RealTime
 local Rand = math.Rand
 local band = bit.band
 local PointContents = util.PointContents
+local TraceLine = util.TraceLine
 local ents_GetAll = ents.GetAll
 local FindByClass = ents.FindByClass
 local CurTime = CurTime
@@ -35,6 +36,7 @@ local file_Find = file.Find
 local JSONToTable = util.JSONToTable
 local TableToJSON = util.TableToJSON
 
+local waterCheckTr = {}
 local nextNPCSoundThink = 0
 local noWepFearNPCs = {
     [ "npc_alyx" ] = true,
@@ -74,7 +76,7 @@ local npcIconHeights = {
     [ "npc_helicopter" ] = 100,
     [ "npc_antlionguard" ] = 150,
     [ "npc_dog" ] = 128,
-    [ "npc_combinegunship" ] = 100,
+    [ "npc_combinegunship" ] = 128,
     [ "npc_combinedropship" ] = 240
 }
 local npcPurePanicScheds = {
@@ -356,6 +358,12 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     npc:SetNW2Entity( "npcsqueakers_sndemitter", sndEmitter )
 end
 
+local function StopSpeaking( npc, voiceType )
+    if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return end
+    local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
+    if IsValid( sndEmitter ) then sndEmitter:Remove() end
+end
+
 local function IsSpeaking( npc, voiceType )
     if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return false end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
@@ -500,7 +508,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastEnemy = NULL
         npc.NPCVC_LastValidEnemy = NULL
         npc.NPCVC_IsLowHealth = false
-        npc.NPCVC_IsSelfDestructing = false
+        npc.NPCVC_InPanicState = false
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastSeenEnemyTime = 0
         npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 10 ) )
@@ -662,8 +670,8 @@ local function OnServerThink()
                     PlaySoundFile( npc, "taunt" )
                 end
                 npc.NPCVC_LastEnemy = curEnemy
-            elseif !npc.NPCVC_IsSelfDestructing then
-                npc.NPCVC_IsSelfDestructing = true
+            elseif !npc.NPCVC_InPanicState then
+                npc.NPCVC_InPanicState = true
 
                 SimpleTimer( Rand( 0.8, 1.25 ), function()
                     if !IsValid( npc ) then return end
@@ -736,52 +744,114 @@ local function OnServerThink()
                         end
                     end
                 end
-            elseif npc:GetInternalVariable( "m_lifeState" ) == 0 then
-                local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
+            else
+                local lifeState = npc:GetInternalVariable( "m_lifeState" )
+                if lifeState != 0 and ( npcClass == "npc_combinegunship" or npcClass == "npc_helicopter" ) then
+                    if !IsSpeaking( npc, "death" ) then
+                        PlaySoundFile( npc, "death", true )
+                    end
+                elseif lifeState == 0 then
+                    local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
+                    local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
+                    if isPurelyPanic then
+                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or npcPurePanicScheds[ ( npc:GetCurrentSchedule() + 1000000000 ) ] ) )
 
-                if vcAllowLines_PanicCond:GetBool() and ( barnacled or drownNPCs[ npcClass ] and band( PointContents( npc:WorldSpaceCenter() + npc:GetVelocity() ), CONTENTS_WATER ) != 0  or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or npcPurePanicScheds[ ( npc:GetCurrentSchedule() + 1000000000 ) ] ) ) then
-                    if !IsSpeaking( npc, "panic" ) then
-                        PlaySoundFile( npc, "panic" )
+                        local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
+                        if !isPurelyPanic and engineStallT then isPurelyPanic = ( engineStallT > 0.5 ) end
+
+                        if !isPurelyPanic and drownNPCs[ npcClass ] then
+                            waterCheckTr.start = npc:WorldSpaceCenter()
+                            waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
+                            waterCheckTr.filter = npc
+                            waterCheckTr.collisiongroup = npc:GetCollisionGroup()
+
+                            isPurelyPanic = ( band( PointContents( TraceLine( waterCheckTr ).HitPos ), CONTENTS_WATER ) != 0 )
+                        end
                     end
 
-                    if barnacled then
-                        SimpleTimer( 0.1, function()
-                            if !IsValid( npc ) then return end
+                    if isPurelyPanic then
+                        if !IsSpeaking( npc, "panic" ) then
+                            PlaySoundFile( npc, "panic" )
+                        end
 
-                            local npcMdl = npc:GetModel()
-                            local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
-                            if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
-                                for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
-                                    if !IsValid( barn ) or barn:Health() <= 0 or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
+                        if barnacled then
+                            SimpleTimer( 0.1, function()
+                                if !IsValid( npc ) then return end
 
-                                    local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
-                                    if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
+                                local npcMdl = npc:GetModel()
+                                local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
+                                if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
+                                    for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
+                                        if !IsValid( barn ) or barn:Health() <= 0 or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
 
-                                    sndEmitter:SetSoundSource( ragdoll )
-                                    break
+                                        local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
+                                        if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
+
+                                        sndEmitter:SetSoundSource( ragdoll )
+                                        break
+                                    end
+                                end
+                            end )
+                        end               
+                    else
+                        curEnemy = GetNPCEnemy( npc )
+                        if rolledSpeech and npc.NPCVC_InPanicState then
+                            StopSpeaking( npc, "panic" )
+
+                            if IsValid( curEnemy ) then
+                                PlaySoundFile( npc, "taunt" )
+                            else
+                                PlaySoundFile( npc, "witness" )
+                            end
+                        end
+
+                        local lowHP = npc.NPCVC_IsLowHealth
+                        if lowHP and npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
+                            npc.NPCVC_IsLowHealth = false
+                        end
+
+                        local lastEnemy = npc.NPCVC_LastEnemy
+                        local isPanicking = ( !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
+
+                        if npc:IsNPC() and !npc.IsVJBaseSNPC and npcClass != "npc_barnacle" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
+                            local curState = npc:GetNPCState()
+
+                            if curTime >= npc.NPCVC_NextDangerSoundTime and !IsSpeaking( npc, "panic" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) and vcAllowLines_SpotDanger:GetBool() then
+                                PlaySoundFile( npc, "panic" )
+                                npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
+                            elseif rolledSpeech then
+                                if !isPanicking then
+                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or GetNPCDisposition( npc, curEnemy ) == D_FR ) )
+                                end
+
+                                local combatLine = "taunt" 
+                                if isPanicking or lowHP and random( 1, 4 ) == 1 then
+                                    if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 1000000 then
+                                        combatLine = "panic"
+                                    else 
+                                        combatLine = "idle"
+                                    end
+                                end
+
+                                if curState != npc.NPCVC_LastState then
+                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
+                                        PlaySoundFile( npc, combatLine )
+                                    end
+                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
+                                    if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
+                                        if vcAllowLines_CombatIdle:GetBool() then
+                                            PlaySoundFile( npc, combatLine )
+                                        end
+                                    elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT ) and vcAllowLines_Idle:GetBool() then
+                                        PlaySoundFile( npc, "idle" )
+                                    end
                                 end
                             end
-                        end )
-                    end               
-                else
-                    local lowHP = npc.NPCVC_IsLowHealth
-                    if lowHP and npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
-                        npc.NPCVC_IsLowHealth = false
-                    end
 
-                    curEnemy = GetNPCEnemy( npc )
-                    local lastEnemy = npc.NPCVC_LastEnemy
-                    local isPanicking = ( !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
-
-                    if npc:IsNPC() and !npc.IsVJBaseSNPC and npcClass != "npc_barnacle" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
-                        local curState = npc:GetNPCState()
-
-                        if curTime >= npc.NPCVC_NextDangerSoundTime and !IsSpeaking( npc, "panic" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) and vcAllowLines_SpotDanger:GetBool() then
-                            PlaySoundFile( npc, "panic" )
-                            npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
+                            npc.NPCVC_LastState = curState
                         elseif rolledSpeech then
                             if !isPanicking then
-                                isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or GetNPCDisposition( npc, curEnemy ) == D_FR ) )
+                                isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
                             end
 
                             local combatLine = "taunt" 
@@ -793,50 +863,23 @@ local function OnServerThink()
                                 end
                             end
 
-                            if curState != npc.NPCVC_LastState then
-                                if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
+                            if curEnemy != lastEnemy then
+                                if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
                                     PlaySoundFile( npc, combatLine )
                                 end
                             elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
-                                if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
+                                if IsValid( curEnemy ) then
                                     if vcAllowLines_CombatIdle:GetBool() then
                                         PlaySoundFile( npc, combatLine )
                                     end
-                                elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT ) and vcAllowLines_Idle:GetBool() then
+                                elseif vcAllowLines_Idle:GetBool() then
                                     PlaySoundFile( npc, "idle" )
                                 end
                             end
                         end
-
-                        npc.NPCVC_LastState = curState
-                    elseif rolledSpeech then
-                        if !isPanicking then
-                            isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
-                        end
-
-                        local combatLine = "taunt" 
-                        if isPanicking or lowHP and random( 1, 4 ) == 1 then
-                            if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 1000000 then
-                                combatLine = "panic"
-                            else 
-                                combatLine = "idle"
-                            end
-                        end
-
-                        if curEnemy != lastEnemy then
-                            if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
-                                PlaySoundFile( npc, combatLine )
-                            end
-                        elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
-                            if IsValid( curEnemy ) then
-                                if vcAllowLines_CombatIdle:GetBool() then
-                                    PlaySoundFile( npc, combatLine )
-                                end
-                            elseif vcAllowLines_Idle:GetBool() then
-                                PlaySoundFile( npc, "idle" )
-                            end
-                        end
                     end
+
+                    npc.NPCVC_InPanicState = isPurelyPanic
                 end
             end
 
