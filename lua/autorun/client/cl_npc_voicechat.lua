@@ -740,8 +740,8 @@ local function PopulateToolMenu()
         local setting
         if type == "NumSlider" then
             setting = panel:NumSlider( label, convar, addArgs.min or 0, addArgs.max or 1, addArgs.decimals or 0 )
-        elseif type == "CheckBox" then
-            setting = panel:CheckBox( label, convar )
+        else
+            setting = panel[ type ]( panel, label, convar )
         end
         if helpText then ColoredControlHelp( client, panel, helpText ) end
 
@@ -911,6 +911,19 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Spot Danger", "sv_npcvoicechat_allowlines_spotdanger" )
         AddSettingsPanel( panel, false, "CheckBox", "Panic Conditions", "sv_npcvoicechat_allowlines_panicconds" )
         AddSettingsPanel( panel, false, "CheckBox", "Low On Health", "sv_npcvoicechat_allowlines_lowhealth" )
+
+        panel:Help( "------------------------------------------------------------" )
+
+        panel:Help( "Voiceline Type Directory Paths:" )
+        ColoredControlHelp( false, panel, "Make sure to update the data after changing one of them!" )
+        AddSettingsPanel( panel, false, "TextEntry", "Idle", "sv_npcvoicechat_snddir_idle" )
+        AddSettingsPanel( panel, false, "TextEntry", "Taunt", "sv_npcvoicechat_snddir_taunt" )
+        AddSettingsPanel( panel, false, "TextEntry", "Death", "sv_npcvoicechat_snddir_death" )
+        AddSettingsPanel( panel, false, "TextEntry", "Kill", "sv_npcvoicechat_snddir_kill" )
+        AddSettingsPanel( panel, false, "TextEntry", "Laugh", "sv_npcvoicechat_snddir_laugh" )
+        AddSettingsPanel( panel, false, "TextEntry", "Witness", "sv_npcvoicechat_snddir_witness" )
+        AddSettingsPanel( panel, false, "TextEntry", "Assist", "sv_npcvoicechat_snddir_assist" )
+        AddSettingsPanel( panel, false, "TextEntry", "Panic", "sv_npcvoicechat_snddir_panic" )
         panel:Help( "" )
     end )
 end

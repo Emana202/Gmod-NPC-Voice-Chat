@@ -79,7 +79,7 @@ local npcPurePanicScheds = {
 }
 local aiDisabled = GetConVar( "ai_disabled" )
 local ignorePlys = GetConVar( "ai_ignoreplayers" )
-local voicelineDirs = { [ "idle" ] = "npcvoicechat/vo/idle/", [ "witness" ] = "npcvoicechat/vo/witness/", [ "death" ] = "npcvoicechat/vo/death/", [ "panic" ] = "npcvoicechat/vo/panic/", [ "taunt" ] = "npcvoicechat/vo/taunt/", [ "kill" ] = "npcvoicechat/vo/kill/", [ "laugh" ] = "npcvoicechat/vo/laugh/", [ "assist" ] = "npcvoicechat/vo/assist/" }
+local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist" }
 
 -- Dear god...
 local defaultNames = { "Based Kleiner", "The Real Zeta Player", "Beta", "Generic Name 1", "Ze Uberman", "Q U A N T U M P H Y S I C S", "portable fridge", "Methman456", "i rdm kids for breakfast", "Cheese Adiction Therapist", "private hoovy", "Socks with Sandals", "Solar", "AdamYeBoi", "troll", "de_struction and de_fuse", "de_rumble", "decoymail", "Damian", "BrandontheREDSpy", "Braun", "brent13", "BrokentoothMarch", "BruH", "BudLightVirus", "Call of Putis", "CanadianBeaver", "Cake brainer", "cant scream in space", "CaptGravyBoness", "CaraKing09", "CarbonTugboat", "CastHalo", "cate", "ccdrago56", "cduncan05", "Chancellor_Ant", "Changthunderwang", "Charstorms", "Ch33kCLaper69", "Get Good Get Lmao Box", "Atomic", "Audrey", "Auxometer", "A Wise Author", "Awtrey516", "Aytx", "BabaBooey", "BackAlleyDealerMan", "BalieyeatsPizza", "ballzackmonster", "Banovinski", "bardochib", "BBaluka", "Bean man", "Bear", "Bearman_18", "beeflover100", "Albeon Stormhammer", "Andromedus", "Anilog", "Animus", "Sorry_an_Error_has_Occurred", "I am the Spy", "engineer gaming", "Ze Uberman", "Regret", "Sora", "Sky", "Scarf", "Graves", "bruh moment", "Garrys Mod employee", "i havent eaten in 69 days", "DOORSTUCK89", "PickUp That Can Cop", "Never gonna give you up", "if you are reading this, ur mom gay ", "The Lemon Arsonist", "Cave Johnson", "Chad", "Speedy", "Alan", "Alpha", "Bravo", "Delta", "Charlie", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet", "Kilo", "Lima", "Lina", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-Ray", "Yankee", "Zulu", "Flare", "Brian", "Frank", "Blaze", "Rin", "Bolt", "runthemingesarecoming", "Brute", "Snare", "Matt", "Arc", "VeeVee", "Serv", "Manjaro", "Sentinal", "Night", "Cayde", "Ranger", "Coach", "Bob Ross", "Mossman", "Nova", "drop10kthisisamug2874", "NUCCCLLEEEEEOOOOOOON", "u mad", "TheAdminge", "Trace", "Kelly", "Marauder", "AVATAR", "Scout", "Mirage", "Spark", "Jolt", "Ghost", "Summer", "Breenisgay69", "Dr Breen", "Combino", "Beowulf", "Heavy Weapons Guy", "GodFather", "Cheaple", "Desmond the epic", "Despairaity", "Destroyer_V0", "Devout Buddhist", "DingoGorditas", "DiscoDodgeBall", "Doc Johnson", "Dogmeat Tactical Vest", "Dogboy", "D O I N K", "ThatMW2Squeaker", "EBOI BOI BOI BOI BOI BOI BOI", "Condescending Idiot", "CoolColton947", "CordingWater6", "Cpt_Core", "Crofty", "Crusader", "Ctoycat", "Cyclops", "Daddy_Debuff", "dallas", "DaLocust56", "Danny DeVito", "DaNub2038", "DarkNinjaD", "DarthHighGround", "DarthOobleck", "Dassault Mirage 2000C", "Davidb16", "D4rp_b0y", "Ruzzk1y", "SanicYT948", "sanitter", "Sanity", "Schutzhund", "scipion34", "Scotty2Hotty", "Seltzer", "Senior Cangrejo", "sfingers02", "Sharkgoat", "SharkyShark", "Shawty Like A Melody", "sh00shyb0i", "ShrekYeeter69", "Shrubster", "SirSamTheMan", "skinny peen", "Skulleewag395", "SleepingWarkat", "Sleipnlr", "Small PP Man", "SmortSocks", "Snapsro94", "Snipeshot556", "Snoot", "remember_no_russian", "Res", "ricefouboi", "rickymicdoo", "Rigatoni", "Robo7988143", "Rocketeer097", "Rollinwind", "rolltide10032", "Rome12310", "rushbuild", "mason the numbers what do they mean", "onin ring", "0nyx", "oofiet", "Orlorin_Foolofatook26", "pablo", "Paft_Dunk", "Panther0706", "Patrick", "PD53", "Pedro", "Peel1", "PenaPVP", "Penguan", "pepegonzalez2006", "Pescaxo", "phatty", "Piard", "Pickles", "Pigeon", "PilotJames007", "Pilotlily", "Piratenkapitan", "PixelG", "planewithnocanards", "platypus429", "Plumpotato47", "PM Prayuth", "poop_sock6969", "PollutionDieingPlanet", "Popsicle-Biscuit", "portable fridge", "Potatogamer555", "Prinz Eugen007", "PrivateWings", "PuercoVolador", "Purple Toyota AE87", "Pyromaniac", "B", "Quacker The Ducker", "Quadrapuds", "Obama", "obamas-last-name", "Aria", "0nE", "FluffySkunkBoy", "John117", "Kanye Bear", "NASCAR FAN 48", "Nightengale537", "Painini", "picklface", "Slavic_Chicken", "Snoucher", "Special", "wheatly_crab", "Yuri Kuroyanagi", "Doof", "Doritos Toasted Corn Tortilla Chips", "Doubletimes", "Dragon", "Adrian", "Umbreon-Kun", "Im happy :D", "Im Sad D:", "Dead Meme", "Kohan-Kun", "Juan", "Chunky Joe", "Slyblindfox", "Trump", "Ronald", "Kortex", "Kim Jack Off", "Aimlocked", "KloGuy", "Chucky", "Volcano", "Doge Mint", "JackTheRipper", "Just a Cardboard Box", "~Erim~", "muesli", "Saiko", "aoihitsuji", "Reayr1", "Mekako", "ddaydeath", "Str00kerX", "Yuki", "Rena.", "cOnFuSeD", "terminator YD", "Kylin", "Seki", "Osmund", "Botulism Betty", "miyuki", "Pway pway", "TKO | gag0!", "Styx", "/sng/", "OWO", "Kr@zZy", "c0rsair", "nexcor", "pr3st0", "663", "V0id", "Killing Frenzy", "Campers Death", "You make me Laugh", "killaura", "Violently Happy", "Make my Day", "Pissed Off", "Bloodlust", "b02fof", "Zap!", "Dredd", "Fuzzey", "Bucus", "mokku", "A Professional With Standards", "Archimedes!", "Glorified Toaster with Legs", "Yana", "Your pet turtle", "You smell bad", "You smell nice", "I'm real", "Let's make children", "chen y", "NotDuckie", "De_stroyed", "nabongS", "h8 exam", "Crazii", "i h8 myself", "jowak1n", "beyluta", "natty_the_great", "ernest_aj", "bored", "hambug | buying skins", "Kiwino", "farn", "hezzy", "misty :3", "taFFy", "Kei", "I love you", "Sasucky", "eisoptrophobia.", "Yzui", "VKDrummer", "GDliZy", "Schizo x.O", "Yowza", "Hikari", "Niltf", "Kiruh", "caKuma", "Inkou PM", "I wish i was dead", "iamsleepless", "Hackyou", "Sokiy", "Kairu", "hatihati", "tarumaru", "berthe", "MB295", "Jumo", "kirkimedes", "Souless", "LamZee", "Aya-Chan", "gvek", "El Jägermeister", "ikitakunai", "Meti ", "VyLenT", "AlesTA", "Remi", "FTruby", "Touka_", "henkyyi", "Nitrogen09", "moyazou", "chamaji", "ramjam18", "VyYui", "tsumiki", "__dd", "Jushy", "TANUKANA", "Aeyonna | loving you hurts", "Alux.", "Young Jager", "Exhausted Life", "A E S T H E T I C", "Thomas_", "Ross Scarlet", "sonamed", "kuben", "Loord", "pasha", "Neo", "GoodRifle", "alex", "xF", "tb", "karl", "Virgo", "Savage", "rita", "prom1se", "xiaoe", "karrigan", "ArcadioN", "Friis", "wazorN", "suraNga", "minet", "j$", "zonic H$", "trace", "ave", "Sunde ACEEE", "Maximus", "Snappi", "xone", "luffeb", "katulen", "Strangelet", "AllThatGlitters21", "BreakingNYC", "DancingCrazy351", "fish be like i spendz da sack", "Darkrogue20", "davedays", "DieAussenseiter", "DragonCharlz", "eddysson86", "ef12striker", "EllesGlitterGossip", "esmeedenters", "HeadsUpLisa | Lwoosers", "hotforwords", "Düktor", "IntelExtremeMasters", "Monarch5150", "mouzmovie", "LUlyuo", "NCIXcom", "RayWilliamJohnson", "RubberRoss ", "seductioncoach", "septinho", "soundlyawake", "Blacklegion104 ", "ICANHAZHEADSHOT ", "so4p | Lwoosers", "gg_legol4s3rZ7", "Dert", "HDstarcraft ", "Husky", "h0N123", "Da-MiGhtY 4357", "NetManiac", "Kyu >3<", ">PartiZan<", "K!110grAmm", "SchtandartenFuhrer", "mu1ti-K!ll", "=ZL0Y=", "HeadKilla ==(oo)=>", "dub", "Kara", "Mechano!d", "3v!LKilla", "viz0r", "MiXa", "DiGGeR", "=GRoMoZeKA=", "ZveroBoy", "ahl.", "bds.", "brunk", "ElemenT", "fisker", "goseY", "Potti", "Morda", "n0name| S>Keys B>Knives", "NiTron", "Normal Human", "xXSniper_MainXx", "Left Foot In", "Right Foot Out", "Left Handed", "Calcium", "Dinnerbone", "Terrible Terror", "Shoot Me", "Aquatic Mammal", "Poopy Joe", "Free Stuff?", "Needs More Salt", "Duck Feet", "Impossibly Epic", "Joe Mamma", "Catapult of Pain", "Drunk and Scottish", "Half Life 3", "The Last Chip", "Pete", "Mercedes Benz", "Vergil", "FriskyRisky", "Bad Cop", "PersonCake", "SoundAngels", "StrongChase", "Sultryla", "Switzersu", "TagzRip", "TalentCover", "Telemil", "Warrameha", "MrMuskyHusky", "ImBoosted", "PanzerKommandant|8thPanzer", "johnzeus19", "Dunnionringz", "The Helper", "annajnavarro", "Lévi", "Fat Whale", "God HATES you!", "vintige kratskrag", "Who?", "Demoman Takes Skill!", "DohnJoe", "Santa Claus Schoolgirl", "Botulism Betty", "Straight from botnames.txt!", "Blessed To Moonwalk", "Chris P. Bacon", "Consume your Calcium", "rubbedsaltwound", "Content Quality Control", "SpamCracker", "Alcohol + Poor Life Decisions", "salad", "i dont sleep", "Kritty Kat", "Headshot!", "Mini-Biscuits Rights Activist.", "I'm not gay, but $20 is $20", "Dr. Mantis Toboggan", "The Buttstaber", "2 FAST 4 U", "The Living Lawn Mower ", "Don't Fuckle With Shuckle", "Yolo Swaggins", "Suppository Breadcrumbs", "The Inhuman Scorch", "Honey I healed the Heavy", "Drinking + Driving", "spicy comments", "The Terrible Spicy Tea", "Thomas the Wank Engine", "Special Needs Engineer", "A Strange Festive Newt Gingrich", "A Sexually Attractive Cactus", "Swaghetti Yolonaise", "butt soup ", "Alcoholic Fat Guy", "Afraid Egg", "It's Legal in Japan", "I'm So Meta Even This Acronym.", "Unusual Foppish Boner", "Awkward Cuddle Boner", "A Distinctive lack of YOU!", "The Spanish Inquisition", "A Duck On Quack", "obesity related illness.", "ASS PANCAKES!", "Bodyshots Johnson", "Nein Lives.", "Dispenser (Target Practice)", "Country-Steak:Sauce", "Sock Full of Shame", "An overdose of French Toast", "One Kawaii MotherFucker", "Smokey Joe", "The Spicy Meatball.", "I Eat Toddlers", "Cunning Linguist", "3DayOldTeleportedBread", "Replay", "The Intense Hoovy Main", "?", "About_30_ninjas", "Ithoughtshewaslvl18 ", "404 GF not found  ", "IfIDiedIWasAFK ", "Jimmies Rustler", "go go gadget aimbot ", "Neil, Intergalactic Grandpa", "General Steiner", "Crazy Dewfus", "Sympatriotic", "doge", "Warmachine", "Diarrhea On Wheels", "Roasty my Toasty", "Steve Handjobs", "the hottest cheeto ever, man", "Imagine actually dying to WM1", "Vince makes you say Shamwow", "PyrosAreAssholes", "Hilarious Bread", "poo c", "19 year old virgin", "Parasitic watermelon", "Welcome to Costco", "Sick Marmalade, Grandpa ", "buttsaggington", "Mother Fucking Oedipus", "I wonder what cum taste likes", "Money, Hoes and Spaghetti-O's", "Mister Lister the Sister Fister", "Jonk", "Diet Cocaine", "Suspiciously Slow Scout", "Space Gandhi", "urine for a treat", "Delusional Arsonist", "Yung Micheal", "Old Man of America", "Spam & Heals Inc.", "yes_u_suck", "I_YELL_ALOT", "DroolTool", "A very fat man named Minh", "heavy from team fortress 5", "Cheesus Evangelionist", "Just a noob", "WetHitter", "Unsubscribe", "WeThePizza", "LactoseTheIntolerant", "MagicLOL", "getVACburned", "BeatdownMachine", "Such_A_Noob", "Balloonicorn", "Phosuphi", "BeardNoMore", "CutthroatChicken", "YourNameOnMySword", "BarryMcKackiner", "MyAxeYourFace", "Bagelofdeath", "Window Maker", "Rock8Man", "UsedFood", "beepbeepimajeep", "bitpull ", "PatMaximum", "you snoze you loze", "I_fap_twohanded", "DixonCider", "NoChildSupport", "Don't Shoot I'm a virgin ", "Pvt. Parts ", "BigD_McGee ", "McD'sHashbrown ", "SnackBitesWillRule ", "Stalin's Organ.", "BadUsernameSince2015", "NoDadNotTheBelt", "BrokenBoneBroker", "DontTouchThat", "InfinityLag", "NullPointer ", "FrankTheCrank", "Mexican't ", "HouseOfChards", "Playing TF2 on A Toaster", "noob", "SpawnOfChaos", "I'm a Nokia ", "Solid Steak", "Killavanilla", "Tactical Toast", "OmgMyNameWontFi ", "Does you has? ", "niche one ", "he ded lol", "Testicular Thorsion ", "you_sun_of_a_beach ", "that's DOCTOR noob 4u ", "hoehoehoe", "PonySlaystation ", "suck my clock", "Muffled Fart ", "ClickSwitch", "GarbageRubberBand", "PennyUnwise", "Kacktus ", "Propanetankhank ", "HeyimGey. ", "Lol a shaved donkey", "De_stroyed", "i h8 myself", "eisoptrophobia.", "Respect your mom", "I wish i was dead", "CakeStealer", "KinosaurusRex", "Maximus", "SpyCrab", "MassTenderizer", "ParrotGal75", "Mentlegen Terrorist", "La Baguette Faguette", "Soup Can", "Lewdest Robot", "Hella Thicc", "Foot Lover Berry", "Hell is NOT okay", "unnamed", "Player", "HereComesThePainTrain", "lololol", "Nope.avi", "Snipping Tool", "Fax Machine", "m0tiVACation", "Just a Cardboard Box", "xXDark_LordXx", "expee", "????????", "nWord", "NotAnEngineer", "KidFromSchool", "Phone", "OmqItswOOdy", "canon father", "dart invader", "FreeeeeIpad", "nonuts", "E", "Carl Johnson", "Big Smoke", "CritsAreFair", "A Commie", "Prankster_Gangster", "Dad", "im going to area51", "AliveFace", "CornCakes", "Morgan", "goD", "Scunts_Sux", "Bruh231", "nikolai.thegamer 2019", "Pixels", "Mark", "Jon", "Garfield", "a pay 2 play", "a free 2 play", "yeet", "ESP", "a bunch of 0s and 1s", "Hitscan", "LmaoBox", "I DIE !", "Barny", "Gordon Freeman", "Drunken Wretch", "No", "IDontHaveAName", "PewDiePie", "Water Sheep", "Sandvich", "Mega dumboon", "MetalLegend", "A girl", "LessCrits", "Mario", "Loogi", "Sven", "Joergen", "'Merica fok ye", "Serbia", "Fonsi", "Despacito", "Pussy Memes", "Hail", "Bird", "SuperNatural", "SomeBruh", "This Guy", "Soulfull", "Undead", "Vehicle", "210Hill", "Bush-Dog", "The Wall", "The Bitch", "FishFace", "BFG 9000", "Bushman", "LucksMan", "Totally a human", "Shadows", "Nuclear Fruitcake", "Gold Steel", "scooteroni", "Mr.Poot", "liveMeat", "TalkyFan", "miss appauling", "Blue Man", "Red Man", "Gray Man", "Oblivious Man", "Rebel", "Havana OOONANA", "superguy", "Abraham da great", "George chopdowninnocenttree", "Franklin Deez nutz", "a wizard", "What", "thats nacho cheeze", "lesbian", "Gay", "papa Pete", "SpookyMint", "keegasp00ks", "Shock" }
@@ -94,61 +94,60 @@ NPCVC_IsInitialized     = NPCVC_IsInitialized or false
 NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
 NPCVC_CachedNPCPfps     = NPCVC_CachedNPCPfps or {}
 
-util.AddNetworkString( "npcsqueakers_playsound" )
-util.AddNetworkString( "npcsqueakers_sndduration" )
-util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
-util.AddNetworkString( "npcsqueakers_resetsettings" )
-util.AddNetworkString( "npcsqueakers_writedata" )
-util.AddNetworkString( "npcsqueakers_requestdata" )
-util.AddNetworkString( "npcsqueakers_returndata" )
-
-net.Receive( "npcsqueakers_sndduration", function()
-    local ent = net.ReadEntity()
-    if IsValid( ent ) then ent.SpeechPlayTime = ( RealTime() + net.ReadFloat() ) end
-end )
-
-net.Receive( "npcsqueakers_resetsettings", function()
-    local cvarCount = net.ReadUInt( 6 )
-    for i = 1, cvarCount do
-        local cvarName = net.ReadString()
-        local convar = GetConVar( cvarName )
-        convar:SetString( convar:GetDefault() )
-    end
-end )
-
-net.Receive( "npcsqueakers_requestdata", function( len, ply )
-    local content = file_Read( "npcvoicechat/" .. net.ReadString(), "DATA" )
-    if !content then return end
-
-    net.Start( "npcsqueakers_returndata" )
-        net.WriteString( content )
-    net.Send( ply )
-end )
-
-net.Receive( "npcsqueakers_writedata", function()
-    local data = net.ReadString()
-    if data then file_Write( "npcvoicechat/" .. net.ReadString(), data ) end
-end )
-
-duplicator.RegisterEntityModifier( "NPC VoiceChat - NPC's Voice Data", function( ply, ent, data )
-    ent.NPCVC_IsDuplicated = true
-    ent.NPCVC_SpeechChance = data.SpeechChance
-    ent.NPCVC_VoicePitch = data.VoicePitch
-    ent.NPCVC_Nickname = data.NickName
-    ent.NPCVC_UsesRealName = data.UsesRealName
-    ent.NPCVC_ProfilePicture = data.ProfilePicture
-    ent.NPCVC_VoiceProfile = data.VoiceProfile
-    ent.NPCVC_PfpBackgroundColor = data.PfpBackgroundColor
-end )
-
 file.CreateDir( "npcvoicechat" )
+
+local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
+local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standard NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
+local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
+local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
+local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
+local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
+local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
+local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
+local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
+local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
+local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
+local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
+local vcLimitAffectsDeathPanic  = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines", 0, 1 )
+local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
+
+local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
+local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
+local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames", "0", cvarFlag, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
+local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
+local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
+local vcVoiceProfileFallback    = CreateConVar( "sv_npcvoicechat_voiceprofilefallbacks", "0", cvarFlag, "If NPC with a voice profile should fallback to default voicelines if its profile doesn't have a specified voice type in it" )
+
+local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
+local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
+local vcAllowLines_Death        = CreateConVar( "sv_npcvoicechat_allowlines_death", "1", cvarFlag, "If NPCs are allowed to play voicelines when they get killed", 0, 1 )
+local vcAllowLines_SpotEnemy    = CreateConVar( "sv_npcvoicechat_allowlines_spotenemy", "1", cvarFlag, "If NPCs are allowed to play voicelines when they first spot their enemy", 0, 1 )
+local vcAllowLines_KillEnemy    = CreateConVar( "sv_npcvoicechat_allowlines_killenemy", "1", cvarFlag, "If NPCs are allowed to play voicelines when kill their enemy", 0, 1 )
+local vcAllowLines_WitnessDeath = CreateConVar( "sv_npcvoicechat_allowlines_witnessdeath", "1", cvarFlag, "If NPCs are allowed to play voicelines when they witness someone getting killed", 0, 1 )
+local vcAllowLines_Assist       = CreateConVar( "sv_npcvoicechat_allowlines_assist", "1", cvarFlag, "If NPCs are allowed to play voicelines when they get assisted by someone in some way, like one of their allies kills their enemy", 0, 1 )
+local vcAllowLines_SpotDanger   = CreateConVar( "sv_npcvoicechat_allowlines_spotdanger", "1", cvarFlag, "If NPCs are allowed to play voicelines when they spot a danger like grenade and etc.", 0, 1 )
+local vcAllowLines_PanicCond    = CreateConVar( "sv_npcvoicechat_allowlines_panicconds", "1", cvarFlag, "If NPCs are allowed to play voicelines when they're currently in some panic inducing condition, like being on fire or being held by player's gravity gun.", 0, 1 )
+local vcAllowLines_LowHealth    = CreateConVar( "sv_npcvoicechat_allowlines_lowhealth", "1", cvarFlag, "If NPCs are allowed to play voicelines when they are low on health.", 0, 1 )
+
+local vcVoiceTypeDirs = {
+    [ "idle" ]      = CreateConVar( "sv_npcvoicechat_snddir_idle", defVoiceTypeDirs[ "idle" ], cvarFlag, "" ),
+    [ "death" ]     = CreateConVar( "sv_npcvoicechat_snddir_death", defVoiceTypeDirs[ "death" ], cvarFlag, "" ),
+    [ "taunt" ]     = CreateConVar( "sv_npcvoicechat_snddir_taunt", defVoiceTypeDirs[ "taunt" ], cvarFlag, "" ),
+    [ "witness" ]   = CreateConVar( "sv_npcvoicechat_snddir_witness", defVoiceTypeDirs[ "witness" ], cvarFlag, "" ),
+    [ "laugh" ]     = CreateConVar( "sv_npcvoicechat_snddir_laugh", defVoiceTypeDirs[ "laugh" ], cvarFlag, "" ),
+    [ "assist" ]    = CreateConVar( "sv_npcvoicechat_snddir_assist", defVoiceTypeDirs[ "assist" ], cvarFlag, "" ),
+    [ "panic" ]     = CreateConVar( "sv_npcvoicechat_snddir_panic", defVoiceTypeDirs[ "panic" ], cvarFlag, "" ),
+    [ "kill" ]      = CreateConVar( "sv_npcvoicechat_snddir_kill", defVoiceTypeDirs[ "kill" ], cvarFlag, "" )
+}
 
 local function AddVoiceProfile( path )
     local _, voicePfpDirs = file_Find( "sound/" .. path .. "/*", "GAME" )
     if !voicePfpDirs then return end
     
     for _, voicePfp in ipairs( voicePfpDirs ) do
-        for voiceType, _ in pairs( voicelineDirs ) do 
+        for voiceType, _ in pairs( defVoiceTypeDirs ) do 
             local voiceTypePath = path .. "/" .. voicePfp .. "/" .. voiceType
             local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME" )
             if !voicelines or #voicelines == 0 then continue end
@@ -191,7 +190,8 @@ local function UpdateData( ply )
     end
 
     table_Empty( NPCVC_VoiceLines )
-    for voiceType, sndDir in pairs( voicelineDirs ) do
+    for voiceType, voiceDir in pairs( vcVoiceTypeDirs ) do
+        local sndDir = voiceDir:GetString() .. "/"
         local lineTbl = {}
         local snds = file_Find( "sound/" .. sndDir .. "*", "GAME" )
         for _, snd in ipairs( snds ) do lineTbl[ #lineTbl + 1 ] = sndDir .. snd end
@@ -220,40 +220,53 @@ end
 
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
 
-local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
-local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standard NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
-local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
-local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
-local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
-local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
-local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
-local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "1", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
-local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
-local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
-local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "0", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
-local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
-local vcLimitAffectsDeathPanic  = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines", 0, 1 )
-local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
+util.AddNetworkString( "npcsqueakers_playsound" )
+util.AddNetworkString( "npcsqueakers_sndduration" )
+util.AddNetworkString( "npcsqueakers_updatespawnmenu" )
+util.AddNetworkString( "npcsqueakers_resetsettings" )
+util.AddNetworkString( "npcsqueakers_writedata" )
+util.AddNetworkString( "npcsqueakers_requestdata" )
+util.AddNetworkString( "npcsqueakers_returndata" )
 
-local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
-local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
-local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames", "0", cvarFlag, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
-local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
-local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
-local vcVoiceProfileFallback    = CreateConVar( "sv_npcvoicechat_voiceprofilefallbacks", "0", cvarFlag, "If NPC with a voice profile should fallback to default voicelines if its profile doesn't have a specified voice type in it" )
+net.Receive( "npcsqueakers_sndduration", function()
+    local ent = net.ReadEntity()
+    if IsValid( ent ) then ent.SpeechPlayTime = ( RealTime() + net.ReadFloat() ) end
+end )
 
-local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
-local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
-local vcAllowLines_Death        = CreateConVar( "sv_npcvoicechat_allowlines_death", "1", cvarFlag, "If NPCs are allowed to play voicelines when they get killed", 0, 1 )
-local vcAllowLines_SpotEnemy    = CreateConVar( "sv_npcvoicechat_allowlines_spotenemy", "1", cvarFlag, "If NPCs are allowed to play voicelines when they first spot their enemy", 0, 1 )
-local vcAllowLines_KillEnemy    = CreateConVar( "sv_npcvoicechat_allowlines_killenemy", "1", cvarFlag, "If NPCs are allowed to play voicelines when kill their enemy", 0, 1 )
-local vcAllowLines_WitnessDeath = CreateConVar( "sv_npcvoicechat_allowlines_witnessdeath", "1", cvarFlag, "If NPCs are allowed to play voicelines when they witness someone getting killed", 0, 1 )
-local vcAllowLines_Assist       = CreateConVar( "sv_npcvoicechat_allowlines_assist", "1", cvarFlag, "If NPCs are allowed to play voicelines when they get assisted by someone in some way, like one of their allies kills their enemy", 0, 1 )
-local vcAllowLines_SpotDanger   = CreateConVar( "sv_npcvoicechat_allowlines_spotdanger", "1", cvarFlag, "If NPCs are allowed to play voicelines when they spot a danger like grenade and etc.", 0, 1 )
-local vcAllowLines_PanicCond    = CreateConVar( "sv_npcvoicechat_allowlines_panicconds", "1", cvarFlag, "If NPCs are allowed to play voicelines when they're currently in some panic inducing condition, like being on fire or being held by player's gravity gun.", 0, 1 )
-local vcAllowLines_LowHealth    = CreateConVar( "sv_npcvoicechat_allowlines_lowhealth", "1", cvarFlag, "If NPCs are allowed to play voicelines when they are low on health.", 0, 1 )
+net.Receive( "npcsqueakers_resetsettings", function()
+    local cvarCount = net.ReadUInt( 6 )
+    for i = 1, cvarCount do
+        local cvarName = net.ReadString()
+        local convar = GetConVar( cvarName )
+        convar:SetString( convar:GetDefault() )
+    end
+    UpdateData()
+end )
+
+net.Receive( "npcsqueakers_requestdata", function( len, ply )
+    local content = file_Read( "npcvoicechat/" .. net.ReadString(), "DATA" )
+    if !content then return end
+
+    net.Start( "npcsqueakers_returndata" )
+        net.WriteString( content )
+    net.Send( ply )
+end )
+
+net.Receive( "npcsqueakers_writedata", function()
+    local data = net.ReadString()
+    if data then file_Write( "npcvoicechat/" .. net.ReadString(), data ) end
+end )
+
+duplicator.RegisterEntityModifier( "NPC VoiceChat - NPC's Voice Data", function( ply, ent, data )
+    ent.NPCVC_IsDuplicated = true
+    ent.NPCVC_SpeechChance = data.SpeechChance
+    ent.NPCVC_VoicePitch = data.VoicePitch
+    ent.NPCVC_Nickname = data.NickName
+    ent.NPCVC_UsesRealName = data.UsesRealName
+    ent.NPCVC_ProfilePicture = data.ProfilePicture
+    ent.NPCVC_VoiceProfile = data.VoiceProfile
+    ent.NPCVC_PfpBackgroundColor = data.PfpBackgroundColor
+end )
 
 local nextbotMETA = FindMetaTable( "NextBot" )
 NPCVC_OldFunc_BecomeRagdoll = NPCVC_OldFunc_BecomeRagdoll or nextbotMETA.BecomeRagdoll
