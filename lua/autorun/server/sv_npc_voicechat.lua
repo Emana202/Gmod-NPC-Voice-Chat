@@ -50,7 +50,8 @@ local noWepFearNPCs = {
 }
 local nonNPCNPCs = {
     [ "npc_bullseye" ] = true,
-    [ "npc_enemyfinder" ] = true
+    [ "npc_enemyfinder" ] = true,
+    [ "npc_cranedriver" ] = true
 }
 local drownNPCs = {
     [ "npc_headcrab" ] = true,
