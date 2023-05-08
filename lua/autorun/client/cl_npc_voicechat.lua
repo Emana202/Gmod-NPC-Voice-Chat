@@ -761,15 +761,14 @@ local function OpenNPCNicknames( ply )
     end
 
     function nameList:OnRowRightClick( id, line )
-        print( line:GetSortValue( 1 ) )
-        -- local value = line:GetSortValue( 1 )
+        local value = line:GetSortValue( 1 )
 
-        -- PlaySound( "buttons/combine_button3.wav" )
-        -- notification_AddLegacy( "Removed " .. value .. " from the NPC nicknames!", 0, 4 ) 
+        PlaySound( "buttons/combine_button3.wav" )
+        notification_AddLegacy( "Removed " .. value .. " from the NPC nicknames!", 0, 4 ) 
 
-        -- table_RemoveByValue( nickNames, value )
-        -- nameList:RemoveLine( id )
-        -- SortNameList()
+        table_RemoveByValue( nickNames, value )
+        nameList:RemoveLine( id )
+        SortNameList()
     end
 
     function confirmButton:DoClick()
