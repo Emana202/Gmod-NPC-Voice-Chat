@@ -6,6 +6,8 @@ local IsValid = IsValid
 local SimpleTimer = timer.Simple
 local random = math.random
 local string_sub = string.sub
+local string_find = string.find
+local lower = string.lower
 local Clamp = math.Clamp
 local table_Empty = table.Empty
 local RealTime = RealTime
@@ -13,6 +15,9 @@ local PlayFile = sound.PlayFile
 local EyeAngles = EyeAngles
 local LocalPlayer = LocalPlayer
 local table_remove = table.remove
+local table_HasValue = table.HasValue
+local table_Merge = table.Merge
+local table_RemoveByValue = table.RemoveByValue
 local max = math.max
 local GetConVar = GetConVar
 local RoundedBox = draw.RoundedBox
@@ -678,6 +683,128 @@ local function OpenNPCBlacklisting( ply )
     end )
 end
 
+local function OpenNPCNicknames( ply )
+    if !ply:IsSuperAdmin() then
+        PlaySound( "buttons/button11.wav" )
+        notification_AddLegacy( "You must be a Super Admin in order to use this!", 1, 4 )
+        return
+    end
+
+    local frame = vgui_Create( "DFrame" )
+    frame:SetSize( 300, 450 )
+    frame:SetSizable( true )
+    frame:SetTitle( "NPC Nickname Editor" )
+    frame:SetDeleteOnClose( true )
+    frame:Center()
+    frame:MakePopup()
+    
+    local label = vgui_Create( "DLabel", frame )
+    label:SetText( "Changes are applied after this window is closes" )
+    label:Dock( TOP )
+    
+    local label2 = vgui_Create( "DLabel", frame )
+    label2:SetText( "Remove an existing name by right clicking at it" )
+    label2:Dock( TOP )
+    
+    local label3 = vgui_Create( "DLabel", frame )
+    label3:SetText( "Make sure to update the data after any changes!" )
+    label3:Dock( TOP )
+
+    local nameList = vgui_Create( "DListView", frame )
+    nameList:Dock( FILL )
+    nameList:SetMultiSelect( false )
+    nameList:AddColumn( "Names", 1 )
+
+    local searchBar = vgui_Create( "DTextEntry", frame )
+    searchBar:Dock( TOP )
+    searchBar:SetPlaceholderText( "Search Bar" )
+
+    local confirmButton = vgui_Create( "DButton", frame )
+    confirmButton:SetText( "Confirm Changes" )
+    confirmButton:Dock( BOTTOM )
+
+    local textEntry = vgui_Create( "DTextEntry", frame )
+    textEntry:SetPlaceholderText( "Enter your names here!" )
+    textEntry:Dock( BOTTOM )
+
+    local nickNames = {}
+
+    local function SortNameList()
+        nameList:Clear()
+
+        local value = searchBar:GetValue()
+        local isEmpty = ( !value or #value == 0 )
+        for _, name in SortedPairsByValue( nickNames ) do
+            if !isEmpty and !string_find( lower( name ), lower( value ) ) then continue end
+            local newLine = nameList:AddLine( name ) 
+            newLine:SetSortValue( 1, name )
+        end
+    end
+    searchBar.OnChange = SortNameList
+
+    function textEntry:OnEnter( value )
+        if !value or #value == 0 then return end
+        textEntry:SetText( "" )
+
+        if table_HasValue( nickNames, value ) then
+            PlaySound( "buttons/button11.wav" )
+            notification_AddLegacy( "This name is already on the list!", 1, 4 )
+            return
+        end
+
+        PlaySound( "buttons/button15.wav" )
+        notification_AddLegacy( "Successfully added " .. value .. " to the NPC nicknames!", 0, 4 )
+
+        local newLine = nameList:AddLine( value )
+        newLine:SetSortValue( 1, value )
+        nickNames[ #nickNames + 1 ] = value
+    end
+
+    function nameList:OnRowRightClick( id, line )
+        print( line:GetSortValue( 1 ) )
+        -- local value = line:GetSortValue( 1 )
+
+        -- PlaySound( "buttons/combine_button3.wav" )
+        -- notification_AddLegacy( "Removed " .. value .. " from the NPC nicknames!", 0, 4 ) 
+
+        -- table_RemoveByValue( nickNames, value )
+        -- nameList:RemoveLine( id )
+        -- SortNameList()
+    end
+
+    function confirmButton:DoClick()
+        PlaySound( "buttons/button15.wav" )
+        frame:Close()
+
+        net.Start( "npcsqueakers_writedata" )
+            net.WriteString( TableToJSON( nickNames ) )
+            net.WriteString( "names.json" )
+        net.SendToServer()
+    end
+
+    net.Start( "npcsqueakers_requestdata" )
+        net.WriteString( "names.json" )
+    net.SendToServer()
+
+    net.Receive( "npcsqueakers_returndata", function()
+        local data = JSONToTable( net.ReadString() )
+        if !data then return end
+        table_Merge( nickNames, data )
+
+        for _, name in SortedPairsByValue( data ) do
+            local newLine = nameList:AddLine( name )
+            newLine:SetSortValue( 1, name )
+        end
+        nameList:InvalidateLayout()
+    end )
+end
+
+concommand.Add( "cl_npcvoicechat_panel_npcspecificvps", OpenClassSpecificVPs )
+concommand.Add( "cl_npcvoicechat_panel_npcblacklist", OpenNPCBlacklisting )
+concommand.Add( "cl_npcvoicechat_panel_npcnicknames", OpenNPCNicknames )
+
+------------------------------------------------------------------------------------------------------------
+
 local function ResetClientSettings( ply )
     for _, cvar in pairs( NPCVC_ClientSettings ) do cvar:SetString( cvar:GetDefault() ) end
 end
@@ -693,8 +820,6 @@ local function ResetServerSettings( ply )
     net.SendToServer()
 end
 
-concommand.Add( "cl_npcvoicechat_panel_npcspecificvps", OpenClassSpecificVPs )
-concommand.Add( "cl_npcvoicechat_panel_npcblacklist", OpenNPCBlacklisting )
 concommand.Add( "cl_npcvoicechat_resetsettings", ResetClientSettings )
 concommand.Add( "sv_npcvoicechat_resetsettings", ResetServerSettings )
 
@@ -876,7 +1001,10 @@ local function PopulateToolMenu()
         end )
 
         panel:Help( "------------------------------------------------------------" )
-        
+
+        panel:Button( "NPC Nickname Editor", "cl_npcvoicechat_panel_npcnicknames" )
+        ColoredControlHelp( false, panel, "Opens a panel that allows you to add or remove nicknames that NPCs will spawn with." )
+
         panel:Button( "NPC Voice Chat Blacklist", "cl_npcvoicechat_panel_npcblacklist" )
         ColoredControlHelp( false, panel, "Opens a panel that allows you to blacklist a specific NPC class from using voicechat." )
 
@@ -889,12 +1017,12 @@ local function PopulateToolMenu()
         panel:Help( "------------------------------------------------------------" )
 
         panel:Help( "You can add new voicelines, nicknames, profile pictures and etc. by doing following the steps below:" )
+        panel:Help( "Nicknames:" )
+        ColoredControlHelp( false, panel, "Use the NPC Nickname Editor panel above" )
         panel:Help( "Voicelines:" )
         ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/vo'.\nIn that directory create a folder with the name of your sound's voiceline type and put the soundfile there. The filename doesn't matter, but the sound must be in .wav, .mp3, or .ogg format, have a frequency of 44100Hz, and must be in mono channel.\nThere are currently 8 types of sounds: assist, death, witness, idle, taunt, panic, laugh, and kill" )
         panel:Help( "Voice Profiles:" )
         ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/voiceprofiles'.\nIn that directory you create a folder with the name of voice profile. After that the steps are the same from the voicelines one" )
-        panel:Help( "Nicknames:" )
-        ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/data/npcvoicechat'. There, you need the 'names.json' file.\nOpen it with you text editor and add or remove as many names as you like to. Just remember to follow the JSON file's formatting" )
         panel:Help( "Profile Pictures:" )
         ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/materials/npcvcdata/profilepics'.\nPut your profile picture images there, but make sure that its format is either .jpg or .png" )
 

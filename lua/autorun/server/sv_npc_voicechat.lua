@@ -11,6 +11,8 @@ local table_Empty = table.Empty
 local cvarFlag = ( FCVAR_ARCHIVE + FCVAR_REPLICATED )
 local RealTime = RealTime
 local Rand = math.Rand
+local band = bit.band
+local PointContents = util.PointContents
 local ents_GetAll = ents.GetAll
 local FindByClass = ents.FindByClass
 local CurTime = CurTime
@@ -52,6 +54,7 @@ local drownNPCs = {
     [ "npc_headcrab" ] = true,
     [ "npc_headcrab_black" ] = true,
     [ "npc_headcrab_fast" ] = true,
+    [ "npc_rollermine" ] = true,
     [ "npc_antlion" ] = true
 }
 local noStateUseNPCs = {
@@ -604,6 +607,8 @@ local function OnPlayerSpawnedNPC( ply, npc )
 end
 
 local function OnNPCKilled( npc, attacker, inflictor, isInput )
+    if !npc.NPCVC_Initialized then return end
+
     if vcAllowLines_Death:GetBool() then
         PlaySoundFile( npc, "death", true, isInput )
     end
@@ -734,7 +739,7 @@ local function OnServerThink()
             elseif npc:GetInternalVariable( "m_lifeState" ) == 0 then
                 local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
 
-                if vcAllowLines_PanicCond:GetBool() and ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or npcPurePanicScheds[ ( npc:GetCurrentSchedule() + 1000000000 ) ] ) ) then
+                if vcAllowLines_PanicCond:GetBool() and ( barnacled or drownNPCs[ npcClass ] and band( PointContents( npc:WorldSpaceCenter() + npc:GetVelocity() ), CONTENTS_WATER ) != 0  or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or npcPurePanicScheds[ ( npc:GetCurrentSchedule() + 1000000000 ) ] ) ) then
                     if !IsSpeaking( npc, "panic" ) then
                         PlaySoundFile( npc, "panic" )
                     end
