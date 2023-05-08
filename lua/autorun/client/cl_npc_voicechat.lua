@@ -20,6 +20,7 @@ local DrawText = draw.DrawText
 local SortedPairsByMemberValue = SortedPairsByMemberValue
 local Lerp = Lerp
 local Material = Material
+local GetPhrase = language.GetPhrase
 local ScrW = ScrW
 local ScrH = ScrH
 local Start3D2D = cam.Start3D2D
@@ -59,9 +60,11 @@ local vcPopupColorB     = CreateClientConVar( "cl_npcvoicechat_popupcolor_b", "0
 
 CreateClientConVar( "cl_npcvoicechat_spawnvoiceprofile", "", nil, true, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
-NPCVC_SoundEmitters         = {}
+NPCVC_SoundEmitters         = NPCVC_SoundEmitters or {}
 NPCVC_VoicePopups           = {}
 NPCVC_VoiceProfiles         = {}
+NPCVC_CachedMaterials       = NPCVC_CachedMaterials or {}
+NPCVC_CachedNamePhrases     = NPCVC_CachedNamePhrases or {}
 
 local function UpdateVoiceProfiles()
     table_Empty( NPCVC_VoiceProfiles )
@@ -146,18 +149,33 @@ local function PlaySoundFile( sndDir, vcData, is3D )
             voicePopup.Sound = snd
             voicePopup.LastPlayPos = playPos
         else
-            local pfpPic = vcData.ProfilePicture
+            local pfpPic, pfpMat = vcData.ProfilePicture
             if pfpPic then
-                pfpPic = Material( pfpPic )
-                if pfpPic and pfpPic:IsError() then pfpPic = nil end
+                pfpMat = NPCVC_CachedMaterials[ pfpPic ]
+                if pfpMat == nil then pfpMat = Material( pfpPic ) end
+                if pfpMat and pfpMat:IsError() then pfpMat = nil end
+                NPCVC_CachedMaterials[ pfpPic ] = ( pfpMat or false )
+            end
+
+            local nickName = vcData.Nickname
+            if vcData.UsesRealName then
+                local nickPhrase = NPCVC_CachedNamePhrases[ nickName ]
+                if !nickPhrase then
+                    nickPhrase = GetPhrase( nickName )
+                    NPCVC_CachedNamePhrases[ nickName ] = nickPhrase
+                end
+                nickName = nickPhrase
+            end
+            if #nickName > 24 then 
+                nickName = string_sub( nickName, 0, 22 ) .. "..." 
             end
 
             NPCVC_VoicePopups[ entIndex ] = {
-                Nick = vcData.Nickname,
+                Nick = nickName,
                 Entity = ent,
                 Sound = snd,
                 LastPlayPos = playPos,
-                ProfilePicture = pfpPic,
+                ProfilePicture = pfpMat,
                 PfpBackgroundColor = vcData.PfpBackgroundColor,
                 VoiceVolume = 0,
                 AlphaRatio = 0,
@@ -339,12 +357,7 @@ local function DrawVoiceChat()
             end
         end
 
-        local nickname = vcData.Nick
-        if #nickname > 22 then 
-            nickname = string_sub( nickname, 0, 20 ) .. "..." 
-        end
-        DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
-
+        DrawText( vcData.Nick, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
         drawY = ( drawY - 44 )
     end
 end
@@ -357,11 +370,15 @@ local function OnCreateClientsideRagdoll( owner, ragdoll )
     end )
 end
 
+hook.Add( "Tick", "NPCSqueakers_UpdateSounds", UpdateSounds )
+hook.Add( "PreDrawEffects", "NPCSqueakers_DrawVoiceIcons", DrawVoiceIcons )
+hook.Add( "HUDPaint", "NPCSqueakers_DrawVoiceChat", DrawVoiceChat )
+hook.Add( "CreateClientsideRagdoll", "NPCSqueakers_OnCreateClientsideRagdoll", OnCreateClientsideRagdoll )
+
 ------------------------------------------------------------------------------------------------------------
 
-NPCVC_ClientSettings            = NPCVC_ClientSettings or {}
-NPCVC_ServerSettings            = NPCVC_ServerSettings or {}
-NPCVC_CachedNPCIconMaterials    = NPCVC_CachedNPCIconMaterials or {}
+NPCVC_ClientSettings    = NPCVC_ClientSettings or {}
+NPCVC_ServerSettings    = NPCVC_ServerSettings or {}
 
 local function OpenClassSpecificVPs( ply )
     if !ply:IsSuperAdmin() then
@@ -417,7 +434,7 @@ local function OpenClassSpecificVPs( ply )
         npcImg:SetSize( 100, 100 )
         npcImg:Dock( TOP )
         
-        local iconMat = NPCVC_CachedNPCIconMaterials[ class ]
+        local iconMat = NPCVC_CachedMaterials[ class ]
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
@@ -425,7 +442,7 @@ local function OpenClassSpecificVPs( ply )
         if iconMat != false and !iconMat:IsError() then 
             npcImg:SetMaterial( iconMat )
         end
-        NPCVC_CachedNPCIconMaterials[ class ] = ( iconMat or false ) 
+        NPCVC_CachedMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -584,7 +601,7 @@ local function OpenNPCBlacklisting( ply )
         npcImg:SetSize( 100, 100 )
         npcImg:Dock( TOP )
 
-        local iconMat = NPCVC_CachedNPCIconMaterials[ class ]
+        local iconMat = NPCVC_CachedMaterials[ class ]
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "vgui/entities/" .. class ) end
@@ -592,7 +609,7 @@ local function OpenNPCBlacklisting( ply )
         if iconMat != false and !iconMat:IsError() then 
             npcImg:SetMaterial( iconMat )
         end
-        NPCVC_CachedNPCIconMaterials[ class ] = ( iconMat or false ) 
+        NPCVC_CachedMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -683,14 +700,14 @@ concommand.Add( "sv_npcvoicechat_resetsettings", ResetServerSettings )
 
 ------------------------------------------------------------------------------------------------------------
 
--- There might be a better way to do this, but this also should work
-local sbNextbotsInstalled = file.Exists( "entities/sb_advanced_nextbot_soldier_base.lua", "LUA" )
-
 local function AddToolMenuTabs()
     spawnmenu.AddToolCategory( "Utilities", "YerSoMashy", "YerSoMashy" )
 end
 
 local function PopulateToolMenu()
+    -- There might be a better way to do this, but this also should work
+    local sbNextbotsInstalled = file.Exists( "entities/sb_advanced_nextbot_soldier_base.lua", "LUA" )
+
     local function ColoredControlHelp( isClient, panel, text )
         local help = panel:ControlHelp( text )
         help:SetTextColor( isClient and clientColor or serverColor )
@@ -889,18 +906,14 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Death", "sv_npcvoicechat_allowlines_death" )
         AddSettingsPanel( panel, false, "CheckBox", "Spot Enemy", "sv_npcvoicechat_allowlines_spotenemy" )
         AddSettingsPanel( panel, false, "CheckBox", "Kill Enemy", "sv_npcvoicechat_allowlines_killenemy" )
-        AddSettingsPanel( panel, false, "CheckBox", "Ally Death", "sv_npcvoicechat_allowlines_allydeath" )
+        AddSettingsPanel( panel, false, "CheckBox", "Witness Death", "sv_npcvoicechat_allowlines_witnessdeath" )
         AddSettingsPanel( panel, false, "CheckBox", "Assisted", "sv_npcvoicechat_allowlines_assist" )
         AddSettingsPanel( panel, false, "CheckBox", "Spot Danger", "sv_npcvoicechat_allowlines_spotdanger" )
-        AddSettingsPanel( panel, false, "CheckBox", "Catch On Fire", "sv_npcvoicechat_allowlines_catchonfire" )
+        AddSettingsPanel( panel, false, "CheckBox", "Panic Conditions", "sv_npcvoicechat_allowlines_panicconds" )
         AddSettingsPanel( panel, false, "CheckBox", "Low On Health", "sv_npcvoicechat_allowlines_lowhealth" )
         panel:Help( "" )
     end )
 end
 
-hook.Add( "Tick", "NPCSqueakers_UpdateSounds", UpdateSounds )
-hook.Add( "PreDrawEffects", "NPCSqueakers_DrawVoiceIcons", DrawVoiceIcons )
-hook.Add( "HUDPaint", "NPCSqueakers_DrawVoiceChat", DrawVoiceChat )
-hook.Add( "CreateClientsideRagdoll", "NPCSqueakers_OnCreateClientsideRagdoll", OnCreateClientsideRagdoll )
 hook.Add( "AddToolMenuTabs", "NPCSqueakers_AddToolMenuTab", AddToolMenuTabs )
 hook.Add( "PopulateToolMenu", "NPCSqueakers_PopulateToolMenu", PopulateToolMenu )
