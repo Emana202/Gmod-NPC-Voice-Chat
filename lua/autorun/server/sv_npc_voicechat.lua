@@ -152,6 +152,7 @@ local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
+local vcUseMdlIcons             = CreateConVar( "sv_npcvoicechat_usemodelicons", "0", cvarFlag, "If NPCs should use their model's spawnicon instead of the one from NPC tab. This will only work if NPC's model had appeared in spawnmenu atleast once", 0, 1 )
 local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", "0", cvarFlag, "If NPCs are only allowed to use profile pictures that are placed by players", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
@@ -470,16 +471,17 @@ local function GetNPCProfilePicture( npc )
     local npcClass = npc:GetClass()
     local profilePic = NPCVC_CachedNPCPfps[ npcClass ]
     if profilePic == nil or profilePic != false then
-        local iconName = "entities/" .. npcClass .. ".png"
-        local iconMat = Material( iconName )
-
-        if iconMat:IsError() then
-            iconName = "vgui/entities/" .. npcClass
+        local mdlDir, iconName, iconMat = npc:GetModel()
+        if vcUseMdlIcons:GetBool() and mdlDir then
+            iconName = "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png"
             iconMat = Material( iconName )
-
+        else
+            iconName = "entities/" .. npcClass .. ".png"
+            iconMat = Material( iconName )
             if iconMat:IsError() then
-                local mdlDir = npc:GetModel()
-                if mdlDir then
+                iconName = "vgui/entities/" .. npcClass
+                iconMat = Material( iconName )
+                if iconMat:IsError() and mdlDir then
                     iconName = "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png"
                     iconMat = Material( iconName )
                 end
