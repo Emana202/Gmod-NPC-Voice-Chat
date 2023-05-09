@@ -486,17 +486,6 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 PlaySoundFile( npc, "laugh" )
                 continue
             end
-
-            if witnessLines and doWitness and ( entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) ) then
-                if GetNPCDisposition( npc, ent ) == D_LI then
-                    PlaySoundFile( npc, ( random( 1, 3 ) == 1 and "panic" or "witness" ) )
-                    continue
-                end
-                if GetNPCDisposition( npc, ent ) == D_NU then
-                    PlaySoundFile( npc, "witness" )
-                    continue
-                end
-            end
             
             if GetNPCDisposition( npc, attacker ) != D_HT and assistLines and attackPos:DistToSqr( npcPos ) <= 562500 then
                 local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
@@ -510,6 +499,11 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                     PlaySoundFile( npc, "assist" )
                     continue
                 end
+            end
+
+            if witnessLines and doWitness and ( entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) ) then
+                PlaySoundFile( npc, ( ( GetNPCDisposition( npc, ent ) == D_LI and random( 1, 3 ) == 1 ) and "panic" or "witness" ) )
+                continue
             end
         end
     end
