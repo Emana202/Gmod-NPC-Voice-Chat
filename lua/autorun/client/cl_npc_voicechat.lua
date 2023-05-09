@@ -944,7 +944,6 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
         AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
-        AddSettingsPanel( panel, false, "CheckBox", "Use NPC Model's Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPCs should use their model's spawnicon instead of the one from NPC tab. This will only work if NPC's model had appeared in spawnmenu atleast once" )
         AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
 
         AddSettingsPanel( panel, false, "NumSlider", "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", {
