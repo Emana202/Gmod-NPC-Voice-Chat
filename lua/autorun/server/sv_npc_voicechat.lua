@@ -8,6 +8,7 @@ local string_sub = string.sub
 local Clamp = math.Clamp
 local abs = math.abs
 local table_Empty = table.Empty
+local table_Merge = table.Merge
 local cvarFlag = ( FCVAR_ARCHIVE + FCVAR_REPLICATED )
 local RealTime = RealTime
 local Rand = math.Rand
@@ -101,6 +102,7 @@ util.AddNetworkString( "npcsqueakers_returndata" )
 NPCVC_NickNames         = NPCVC_NickNames or {}
 NPCVC_VoiceLines        = NPCVC_VoiceLines or {}
 NPCVC_ProfilePictures   = NPCVC_ProfilePictures or {}
+NPCVC_UserPFPs          = NPCVC_UserPFPs or {}
 NPCVC_VoiceProfiles     = NPCVC_VoiceProfiles or {}
 NPCVC_NPCVoiceProfiles  = NPCVC_NPCVoiceProfiles or {}
 NPCVC_NPCBlacklist      = NPCVC_NPCBlacklist or {}
@@ -118,6 +120,7 @@ local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
+local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", "0", cvarFlag, "If NPCs are only allowed to use profile pictures that are placed by players", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
@@ -218,6 +221,14 @@ local function UpdateData( ply )
         NPCVC_ProfilePictures[ #NPCVC_ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
     end
 
+    table_Empty( NPCVC_UserPFPs )
+    pfpPics = file_Find( "materials/npcvcdata/custompfps/*", "GAME" )
+    if pfpPics then
+        for _, pfpPic in ipairs( pfpPics ) do
+            NPCVC_UserPFPs[ #NPCVC_UserPFPs + 1 ] = "npcvcdata/custompfps/" .. pfpPic
+        end
+    end
+
     table_Empty( NPCVC_VoiceProfiles )
     AddVoiceProfile( "npcvoicechat/voiceprofiles" )
     AddVoiceProfile( "lambdaplayers/voiceprofiles" )
@@ -271,7 +282,6 @@ duplicator.RegisterEntityModifier( "NPC VoiceChat - NPC's Voice Data", function(
     ent.NPCVC_UsesRealName = data.UsesRealName
     ent.NPCVC_ProfilePicture = data.ProfilePicture
     ent.NPCVC_VoiceProfile = data.VoiceProfile
-    ent.NPCVC_PfpBackgroundColor = data.PfpBackgroundColor
 end )
 
 local nextbotMETA = FindMetaTable( "NextBot" )
@@ -342,8 +352,6 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
         UsesRealName = npc.NPCVC_UsesRealName,
         ProfilePicture = npc.NPCVC_ProfilePicture
     }
-    local pfpBgClr = npc.NPCVC_PfpBackgroundColor
-    if pfpBgClr then vcData.PfpBackgroundColor = pfpBgClr end
 
     local playDelay = ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 )
     if vcSlightDelay:GetBool() then playDelay = ( random( ( playDelay * 10 ), 5 ) / 10 ) end
@@ -385,60 +393,70 @@ local function GetAvailableNickname()
 end
 
 local function GetNPCEnemy( npc )
-    return ( !npc.MNG_TF2Bot and npc:GetEnemy() or npc:GetTarget() )
+    if npc.LastPathingInfraction then return npc.CurrentTarget end
+
+    local getEneFunc = npc.GetEnemy
+    if !getEneFunc then getEneFunc = npc.GetTarget end
+    return ( getEneFunc and getEneFunc( npc ) or NULL )
 end
 
 local tf2BotsDispTranslation = {
-    [ "neutral" ] = D_NU,
-    [ "foe" ] = D_HT,
-    [ "friend" ] = D_LI
+    [ "friend" ]    = D_LI,
+    [ "neutral" ]   = D_NU,
+    [ "foe" ]       = D_HT
 }
 local function GetNPCDisposition( npc, target )
+    if npc.LastPathingInfraction then return D_HT end
     if npc.IsGmodZombie then return ( target.IsGmodZombie and D_LI or D_HT ) end
-    return ( npc.MNG_TF2Bot and ( tf2BotsDispTranslation[ npc:FriendOrFoe( target ) ] or D_NU ) or npc:Disposition( target ) )
+    if npc.MNG_TF2Bot then return ( tf2BotsDispTranslation[ npc:FriendOrFoe( target ) ] or D_NU ) end
+
+    local dispFunc = npc.Disposition
+    return ( dispFunc and dispFunc( npc, target ) or D_NU )
 end
 
 local function GetNPCProfilePicture( npc )
-    local profilePic, pfpBgClr
     if vcUseCustomPfps:GetBool() then
         if vcUseLambdaPfpPics:GetBool() and #Lambdaprofilepictures != 0 then
-            profilePic = Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
-        elseif #NPCVC_ProfilePictures != 0 then
-            profilePic = NPCVC_ProfilePictures[ random( #NPCVC_ProfilePictures ) ]
-        end
-    end
-    
-    if !profilePic then
-        local npcClass = npc:GetClass()
-
-        profilePic = NPCVC_CachedNPCPfps[ npcClass ]
-        if profilePic == nil or profilePic != false then
-            local iconName = "entities/" .. npcClass .. ".png"
-            local iconMat = Material( iconName )
-
-            if iconMat:IsError() then
-                iconName = "vgui/entities/" .. npcClass
-                iconMat = Material( iconName )
-
-                if iconMat:IsError() then
-                    pfpBgClr = Color( random( 0, 255 ), random( 0, 255 ), random( 0, 255 ) )
-
-                    local mdlDir = npc:GetModel()
-                    iconName = ( mdlDir and "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png" )
-                    iconMat = Material( iconName )
+            return Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
+        else
+            local pfpPics = NPCVC_ProfilePictures
+            local userPfps = NPCVC_UserPFPs
+            if #userPfps != 0 then
+                if vcUserPfpsOnly:GetBool() then
+                    pfpPics = userPfps
+                else
+                    pfpPics = table_Merge( pfpPics, userPfps )
                 end
             end
-
-            if !iconMat:IsError() then
-                profilePic = iconName
-                NPCVC_CachedNPCPfps[ npcClass ] = iconName
-            else
-                NPCVC_CachedNPCPfps[ npcClass ] = false
-            end
+            if #pfpPics != 0 then return pfpPics[ random( #pfpPics ) ] end
         end
     end
 
-    return profilePic, pfpBgClr
+    local npcClass = npc:GetClass()
+    local profilePic = NPCVC_CachedNPCPfps[ npcClass ]
+    if profilePic == nil or profilePic != false then
+        local iconName = "entities/" .. npcClass .. ".png"
+        local iconMat = Material( iconName )
+
+        if iconMat:IsError() then
+            iconName = "vgui/entities/" .. npcClass
+            iconMat = Material( iconName )
+
+            if iconMat:IsError() then
+                local mdlDir = npc:GetModel()
+                iconName = ( mdlDir and "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png" )
+                iconMat = Material( iconName )
+            end
+        end
+
+        if !iconMat:IsError() then
+            profilePic = iconName
+            NPCVC_CachedNPCPfps[ npcClass ] = iconName
+        else
+            NPCVC_CachedNPCPfps[ npcClass ] = false
+        end
+    end
+    return profilePic
 end
 
 local function CheckNearbyNPCOnDeath( ent, attacker )
@@ -453,7 +471,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     local assistLines = vcAllowLines_Assist:GetBool()
 
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
-        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or npc.LastPathingInfraction or random( 1, 100 ) > npc.NPCVC_SpeechChance or IsSpeaking( npc ) then continue end
+        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or random( 1, 100 ) > npc.NPCVC_SpeechChance or IsSpeaking( npc ) then continue end
 
         if attacker == npc then
             if killLines and npc.NPCVC_LastValidEnemy == ent then
@@ -468,7 +486,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 PlaySoundFile( npc, "laugh" )
                 continue
             end
-            
+
             if witnessLines and doWitness and ( entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) ) then
                 if GetNPCDisposition( npc, ent ) == D_LI then
                     PlaySoundFile( npc, ( random( 1, 3 ) == 1 and "panic" or "witness" ) )
@@ -542,9 +560,8 @@ local function OnEntityCreated( npc )
             end
             npc.NPCVC_Nickname = nickName
 
-            local profilePic, pfpBgClr = GetNPCProfilePicture( npc )
+            local profilePic = GetNPCProfilePicture( npc )
             npc.NPCVC_ProfilePicture = profilePic
-            npc.NPCVC_PfpBackgroundColor = pfpBgClr
 
             local voicePfp = NPCVC_NPCVoiceProfiles[ npcClass ]
             if !voicePfp then
@@ -569,8 +586,7 @@ local function OnEntityCreated( npc )
                 VoicePitch = voicePitch,
                 NickName = nickName,
                 ProfilePicture = profilePic,
-                VoiceProfile = voicePfp,
-                PfpBackgroundColor = pfpBgClr
+                VoiceProfile = voicePfp
             } )
         end
 
@@ -609,8 +625,7 @@ local function OnPlayerSpawnedNPC( ply, npc )
             NickName = npc.NPCVC_Nickname,
             UsesRealName = npc.NPCVC_UsesRealName,
             ProfilePicture = npc.NPCVC_ProfilePicture,
-            VoiceProfile = voicePfp,
-            PfpBackgroundColor = npc.NPCVC_PfpBackgroundColor
+            VoiceProfile = voicePfp
         } )
     end )
 end
@@ -721,14 +736,11 @@ local function OnServerThink()
                 end
             end
         else
-            local curEnemy
+            local curEnemy = GetNPCEnemy( npc )
             local rolledSpeech = ( random( 1, 100 ) <= npc.NPCVC_SpeechChance )
 
             if npc.LastPathingInfraction then
-                curEnemy = npc.CurrentTarget
-
-                local isVisible = false
-                local lastSeenTime = npc.NPCVC_LastSeenEnemyTime
+                local isVisible, lastSeenTime = false, npc.NPCVC_LastSeenEnemyTime
                 if !IsValid( curEnemy ) then
                     npc.NPCVC_LastSeenEnemyTime = 0
                 elseif npc:GetRangeSquaredTo( curEnemy ) <= 1000000 and npc:Visible( curEnemy ) then
@@ -799,7 +811,6 @@ local function OnServerThink()
                             end )
                         end               
                     else
-                        curEnemy = GetNPCEnemy( npc )
                         if rolledSpeech and npc.NPCVC_InPanicState then
                             StopSpeaking( npc, "panic" )
 
@@ -831,7 +842,7 @@ local function OnServerThink()
 
                                 local combatLine = "taunt" 
                                 if isPanicking or lowHP and random( 1, 4 ) == 1 then
-                                    if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 1000000 then
+                                    if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) then
                                         combatLine = "panic"
                                     else 
                                         combatLine = "idle"
@@ -861,7 +872,7 @@ local function OnServerThink()
 
                             local combatLine = "taunt" 
                             if isPanicking or lowHP and random( 1, 4 ) == 1 then
-                                if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 1000000 then
+                                if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) then
                                     combatLine = "panic"
                                 else 
                                     combatLine = "idle"

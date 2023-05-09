@@ -181,7 +181,6 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 Sound = snd,
                 LastPlayPos = playPos,
                 ProfilePicture = pfpMat,
-                PfpBackgroundColor = vcData.PfpBackgroundColor,
                 VoiceVolume = 0,
                 AlphaRatio = 0,
                 LastPlayTime = 0,
@@ -348,12 +347,6 @@ local function DrawVoiceChat()
         RoundedBox( 4, drawX, drawY, 246, 40, popup_BoxClr )
         
         if drawPfp then
-            local bgClr = vcData.PfpBackgroundColor
-            if bgClr then
-                bgClr.a = popup_BaseClr.a
-                surface_SetDrawColor( bgClr )
-                surface_DrawRect( drawX + 4, drawY + 4, 32, 32 )
-            end
             local pfp = vcData.ProfilePicture
             if pfp then
                 surface_SetDrawColor( popup_BaseClr )
@@ -951,6 +944,7 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
         AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
+        AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
 
         AddSettingsPanel( panel, false, "NumSlider", "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", {
             max = 100
@@ -1015,15 +1009,13 @@ local function PopulateToolMenu()
         
         panel:Help( "------------------------------------------------------------" )
 
-        panel:Help( "You can add new voicelines, nicknames, profile pictures and etc. by doing following the steps below:" )
-        panel:Help( "Nicknames:" )
-        ColoredControlHelp( false, panel, "Use the NPC Nickname Editor panel above" )
+        panel:Help( "You can add new voicelines, voice profiles, and profile pictures by doing following the steps below:" )
+        panel:Help( "Profile Pictures:" )
+        ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/materials/npcvcdata/custompfps'.\nPut your profile picture images there, but make sure that its format is either .jpg or .png" )
         panel:Help( "Voicelines:" )
         ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/vo'.\nIn that directory create a folder with the name of your sound's voiceline type and put the soundfile there. The filename doesn't matter, but the sound must be in .wav, .mp3, or .ogg format, have a frequency of 44100Hz, and must be in mono channel.\nThere are currently 8 types of sounds: assist, death, witness, idle, taunt, panic, laugh, and kill" )
         panel:Help( "Voice Profiles:" )
         ColoredControlHelp( false, panel, "Go to or create this filepath in the game's root directory: 'garrysmod/sound/npcvoicechat/voiceprofiles'.\nIn that directory you create a folder with the name of voice profile. After that the steps are the same from the voicelines one" )
-        panel:Help( "Profile Pictures:" )
-        ColoredControlHelp( false, panel, "Go to this path in the game's root directory: 'garrysmod/materials/npcvcdata/profilepics'.\nPut your profile picture images there, but make sure that its format is either .jpg or .png" )
 
         panel:Help( "------------------------------------------------------------" )
 
