@@ -969,7 +969,9 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "NumSlider", "Speak Limit", "sv_npcvoicechat_speaklimit", "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", {
             max = 25
         } )
-        AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death and Panic", "sv_npcvoicechat_speaklimit_dontaffectdeathpanic", "If the speak limit shouldn't affect NPCs that are playing their death or panicking voicelines" )
+        AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death", "sv_npcvoicechat_speaklimit_dontaffectdeath", "If the speak limit shouldn't affect NPCs that are playing their death voiceline" )
+
+        AddSettingsPanel( panel, false, "CheckBox", "Save Voice Data Of Essential NPCs", "sv_npcvoicechat_savenpcdataonmapchange", "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when sometimes appearing and etc.\nRecommended to turn off when not playing any campaign!" ) 
 
         if LambdaVoiceProfiles then
             panel:Help( "Lambda-Related Stuff:" )
