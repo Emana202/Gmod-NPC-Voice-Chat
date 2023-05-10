@@ -559,14 +559,15 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 PlaySoundFile( npc, ( random( 1, 6 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
-        elseif attackPos and random( 1, 3 ) == 1 then
-            if locAttacker == ent and doWitness and !IsSpeaking( npc, "laugh" ) then
+        elseif attackPos and random( 1, 3 ) != 1 then
+            if locAttacker == ent and !IsSpeaking( npc, "laugh" ) then
                 PlaySoundFile( npc, "laugh" )
                 continue
             end
 
+            local npcPos = npc:GetPos()
+            
             if GetNPCDisposition( npc, locAttacker ) != D_HT then 
-                local npcPos = npc:GetPos()
                 if assistLines and attackPos:DistToSqr( npcPos ) <= 562500 and !IsSpeaking( npc, "assist" ) then
                     local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
                     if !isEnemy and npc:IsNPC() then
@@ -580,11 +581,11 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                         continue
                     end
                 end
+            end
 
-                if witnessLines and doWitness and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
-                    PlaySoundFile( npc, ( ( GetNPCDisposition( npc, ent ) == D_LI and random( 1, 4 ) == 1 ) and "panic" or "witness" ) )
-                    continue
-                end
+            if witnessLines and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
+                PlaySoundFile( npc, ( ( GetNPCDisposition( npc, ent ) == D_LI and random( 1, 4 ) == 1 ) and "panic" or "witness" ) )
+                continue
             end
         end
     end
