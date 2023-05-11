@@ -86,6 +86,7 @@ local nonNPCNPCs = {
     [ "npc_cranedriver" ] = true,
     [ "cycler_actor" ] = true,
     [ "npc_launcher" ] = true,
+    [ "obj_vj_bullseye" ] = true,
     [ "monster_generic" ] = true
 }
 local drownNPCs = {
