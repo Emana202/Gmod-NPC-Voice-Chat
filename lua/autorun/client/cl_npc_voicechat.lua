@@ -190,8 +190,6 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 LastPlayTime = ( canDrawRn and RealTime() or 0 ),
                 FirstDisplayTime = ( canDrawRn and RealTime() or 0 )
             }
-
-            string.NiceSize(number bytes)
         end
 
         net.Start( "npcsqueakers_sndduration" )

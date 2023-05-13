@@ -29,6 +29,7 @@ local table_Count = table.Count
 local table_RemoveByValue = table.RemoveByValue
 local FindInSphere = ents.FindInSphere
 local IsSinglePlayer = game.SinglePlayer
+local IsBasedOn = scripted_ents.IsBasedOn
 local StoreEntityModifier = duplicator.StoreEntityModifier
 local file_Exists = file.Exists
 local file_Read = file.Read
@@ -87,6 +88,8 @@ local nonNPCNPCs = {
     [ "cycler_actor" ] = true,
     [ "npc_launcher" ] = true,
     [ "obj_vj_bullseye" ] = true,
+    [ "animprop_generic" ] = true,
+    [ "animprop_generic_physmodel" ] = true,
     [ "monster_generic" ] = true
 }
 local drownNPCs = {
@@ -615,6 +618,7 @@ local function OnEntityCreated( npc )
 
         local npcClass = npc:GetClass()
         if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
+        if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
