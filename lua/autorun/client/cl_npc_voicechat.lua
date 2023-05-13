@@ -175,6 +175,10 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 nickName = string_sub( nickName, 0, 22 ) .. "..." 
             end
 
+            local displayDist = vcPopupDist:GetInt()
+            displayDist = ( displayDist * displayDist )
+            local canDrawRn = ( displayDist == 0 or LocalPlayer():GetPos():DistToSqr( playPos ) <= displayDist )
+
             NPCVC_VoicePopups[ entIndex ] = {
                 Nick = nickName,
                 Entity = ent,
@@ -182,10 +186,12 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 LastPlayPos = playPos,
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
-                AlphaRatio = 0,
-                LastPlayTime = 0,
-                FirstDisplayTime = 0
+                AlphaRatio = ( canDrawRn and 1 or 0 ),
+                LastPlayTime = ( canDrawRn and RealTime() or 0 ),
+                FirstDisplayTime = ( canDrawRn and RealTime() or 0 )
             }
+
+            string.NiceSize(number bytes)
         end
 
         net.Start( "npcsqueakers_sndduration" )
@@ -268,6 +274,11 @@ local function DrawVoiceIcons()
     end
 end
 
+local scrSizeW, scrSizeH = ScrW(), ScrH()
+local function OnScreenSizeChanged( oldW, oldH )
+    scrSizeW, scrSizeH = ScrW(), ScrH()
+end
+
 local drawPopupIndexes = {}
 local function DrawVoiceChat()
     if !vcShowPopups:GetBool() or !vcEnabled:GetBool() then return end
@@ -297,9 +308,7 @@ local function DrawVoiceChat()
             local leftChan, rightChan = snd:GetLevel()
             sndVol = ( ( leftChan + rightChan ) * 0.5 )
 
-            if displayDist != 0 and plyPos:DistToSqr( lastPos ) > displayDist then
-                vcData.FirstDisplayTime = 0
-            else
+            if displayDist == 0 or plyPos:DistToSqr( lastPos ) <= displayDist then
                 vcData.LastPlayTime = realTime
 
                 if vcData.FirstDisplayTime == 0 then
@@ -319,14 +328,17 @@ local function DrawVoiceChat()
         end
 
         vcData.AlphaRatio = drawAlpha
-        if drawAlpha == 0 then continue end
+        if drawAlpha == 0 then
+            vcData.FirstDisplayTime = 0
+            continue 
+        end
 
         canDrawSomething = true
         drawPopupIndexes[ index ] = vcData
     end
 
     if !canDrawSomething then return end
-    local drawX, drawY = ( ScrW() - 298 ), ( ScrH() - 142 )
+    local drawX, drawY = ( scrSizeW - 298 ), ( scrSizeH - 142 )
     drawY = ( drawY - ( 44 * #g_VoicePanelList:GetChildren() ) )
 
     local popupClrR = vcPopupColorR:GetInt()

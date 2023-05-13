@@ -614,7 +614,7 @@ local function OnEntityCreated( npc )
         end
 
         local npcClass = npc:GetClass()
-        if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
+        if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
@@ -952,7 +952,7 @@ local function OnServerThink()
                         end
 
                         local lastEnemy = npc.NPCVC_LastEnemy
-                        local isPanicking = ( !npc.IsDrGNextbot and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
+                        local isPanicking = ( !npc:IsNextBot() and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
 
                         if npc:IsNPC() and !npc.IsVJBaseSNPC and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
@@ -967,7 +967,7 @@ local function OnServerThink()
 
                                 local combatLine = "taunt" 
                                 if isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
-                                    if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) then
+                                    if IsValid( curEnemy ) and ( curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) ) then
                                         combatLine = "panic"
                                     else 
                                         combatLine = "idle"
@@ -1013,7 +1013,7 @@ local function OnServerThink()
 
                             local combatLine = "taunt" 
                             if isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
-                                if IsValid( curEnemy ) and npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) then
+                                if IsValid( curEnemy ) and ( curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) ) then
                                     combatLine = "panic"
                                 else 
                                     combatLine = "idle"
