@@ -1010,31 +1010,43 @@ local function OnServerThink()
                             end
 
                             npc.NPCVC_LastState = curState
-                        elseif rolledSpeech then
-                            if !isPanicking then
-                                isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
+                        else
+                            if npc.IsDrGNextbot and npc:IsDown() then 
+                                if npc.NPCVC_LastState != 1 then
+                                    PlaySoundFile( npc, "death" )
+                                    npc.NPCVC_LastState = 1
+                                end
+                            elseif npc.NPCVC_LastState == 1 then
+                                npc.NPCVC_LastState = -1
+                                if rolledSpeech and IsValid( curEnemy ) then PlaySoundFile( npc, "taunt" ) end
                             end
 
-                            local combatLine = "taunt" 
-                            if isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
-                                if IsValid( curEnemy ) and ( curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) ) then
-                                    combatLine = "panic"
-                                else 
-                                    combatLine = "idle"
+                            if rolledSpeech then
+                                if !isPanicking then
+                                    isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
                                 end
-                            end
 
-                            if curEnemy != lastEnemy then
-                                if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
-                                    PlaySoundFile( npc, combatLine )
+                                local combatLine = "taunt" 
+                                if isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
+                                    if IsValid( curEnemy ) and ( curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 2250000 or 250000 ) ) then
+                                        combatLine = "panic"
+                                    else 
+                                        combatLine = "idle"
+                                    end
                                 end
-                            elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
-                                if IsValid( curEnemy ) then
-                                    if vcAllowLines_CombatIdle:GetBool() then
+
+                                if curEnemy != lastEnemy then
+                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
                                         PlaySoundFile( npc, combatLine )
                                     end
-                                elseif vcAllowLines_Idle:GetBool() then
-                                    PlaySoundFile( npc, "idle" )
+                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
+                                    if IsValid( curEnemy ) then
+                                        if vcAllowLines_CombatIdle:GetBool() then
+                                            PlaySoundFile( npc, combatLine )
+                                        end
+                                    elseif vcAllowLines_Idle:GetBool() then
+                                        PlaySoundFile( npc, "idle" )
+                                    end
                                 end
                             end
                         end

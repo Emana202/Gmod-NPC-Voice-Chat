@@ -111,7 +111,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
     local ent = vcData.Emitter
     if !IsValid( ent ) then return end
 
-    PlayFile( "sound/" .. sndDir, ( is3D and "3d" or "" ), function( snd, errorId, errorName )
+    PlayFile( "sound/" .. sndDir, "noplay" .. ( is3D and "3d" or "" ), function( snd, errorId, errorName )
         if errorId == 21 then
             PlaySoundFile( sndDir, vcData, false )
             return
@@ -137,6 +137,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
         local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
         snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.75, 1 ), 0 )
+        snd:Play()
 
         NPCVC_SoundEmitters[ #NPCVC_SoundEmitters + 1 ] = {
             Entity = ent,
