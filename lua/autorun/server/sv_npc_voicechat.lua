@@ -4,6 +4,7 @@ local pairs = pairs
 local IsValid = IsValid
 local SimpleTimer = timer.Simple
 local random = math.random
+local randomseed = math.randomseed
 local string_sub = string.sub
 local Clamp = math.Clamp
 local abs = math.abs
@@ -374,18 +375,18 @@ function nextbotMETA:BecomeRagdoll( dmginfo )
 end
 
 local function GetVoiceLine( ent, voiceType )
+    local voiceTbl
+
     local voicePfp = NPCVC_VoiceProfiles[ ent.NPCVC_VoiceProfile ]
     if voicePfp then
-        local voiceTbl = voicePfp[ voiceType ]
-        if voiceTbl and #voiceTbl != 0 then
-            return voiceTbl[ random( #voiceTbl ) ]
-        elseif !vcVoiceProfileFallback:GetBool() then
-            return
-        end
+        voiceTbl = voicePfp[ voiceType ]
+        if ( !voiceTbl or #voiceTbl == 0 ) and !vcVoiceProfileFallback:GetBool() then return end
+    else
+        local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC_VoiceLines ) 
+        voiceTbl = voicelineTbl[ voiceType ]
     end
 
-    local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC_VoiceLines ) 
-    local voiceTbl = voicelineTbl[ voiceType ]
+    randomseed( ent:EntIndex() + ent:GetCreationID() + RealTime() )
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
