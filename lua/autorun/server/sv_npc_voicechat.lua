@@ -180,10 +180,11 @@ NPCVC_UserPFPs          = NPCVC_UserPFPs or {}
 NPCVC_VoiceProfiles     = NPCVC_VoiceProfiles or {}
 NPCVC_NPCVoiceProfiles  = NPCVC_NPCVoiceProfiles or {}
 NPCVC_NPCBlacklist      = NPCVC_NPCBlacklist or {}
+NPCVC_NPCWhitelist      = NPCVC_NPCWhitelist or {}
 NPCVC_IsInitialized     = NPCVC_IsInitialized or false
 NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
-NPCVC_CachedNPCPfps     = NPCVC_CachedNPCPfps or {}
 NPCVC_MapTransitionNPCs = NPCVC_MapTransitionNPCs or nil
+NPCVC_CachedNPCPfps     = {}
 
 file.CreateDir( "npcvoicechat" )
 
@@ -280,6 +281,14 @@ local function UpdateData( ply )
         file_Write( "npcvoicechat/npcblacklist.json", TableToJSON( NPCVC_NPCBlacklist ) )
     else
         NPCVC_NPCBlacklist = JSONToTable( npcBlacklist )
+    end
+
+    local npcWhitelist = file_Read( "npcvoicechat/npcwhitelist.json", "DATA" )
+    if !npcWhitelist then
+        table_Empty( NPCVC_NPCWhitelist )
+        file_Write( "npcvoicechat/npcwhitelist.json", TableToJSON( NPCVC_NPCWhitelist ) )
+    else
+        NPCVC_NPCWhitelist = JSONToTable( npcWhitelist )
     end
 
     table_Empty( NPCVC_VoiceLines )
@@ -469,7 +478,6 @@ local function GetAvailableNickname()
 end
 
 local function GetNPCEnemy( npc )
-    if npc.LastPathingInfraction then return npc.CurrentTarget end
     if npc:GetClass() == "reckless_kleiner" then 
         local vehicle = npc:GetParent()
         return ( IsValid( vehicle ) and vehicle.enemy )
@@ -477,7 +485,7 @@ local function GetNPCEnemy( npc )
 
     local getEneFunc = npc.GetEnemy
     if !getEneFunc then getEneFunc = npc.GetTarget end
-    return ( getEneFunc and getEneFunc( npc ) or NULL )
+    return ( getEneFunc and getEneFunc( npc ) or ( npc.CurrentTarget or npc.Enemy or npc.Target or NULL ) )
 end
 
 local tf2BotsDispTranslation = {
@@ -486,11 +494,10 @@ local tf2BotsDispTranslation = {
     [ "foe" ]       = D_HT
 }
 local function GetNPCDisposition( npc, target )
-    if npc.IsGmodZombie then return ( target.IsGmodZombie and D_LI or D_HT ) end
     if npc.MNG_TF2Bot then return ( tf2BotsDispTranslation[ npc:FriendOrFoe( target ) ] or D_NU ) end
 
     local dispFunc = npc.Disposition
-    return ( dispFunc and dispFunc( npc, target ) or D_HT )
+    return ( dispFunc and dispFunc( npc, target ) or ( target:GetClass() == npc:GetClass() and D_LI or D_HT ) )
 end
 
 local function GetNPCProfilePicture( npc )
@@ -518,14 +525,19 @@ local function GetNPCProfilePicture( npc )
         local iconMat = Material( iconName )
 
         if iconMat:IsError() then
-            iconName = "vgui/entities/" .. npcClass
+            iconName = "entities/" .. npcClass .. ".jpg"
             iconMat = Material( iconName )
 
             if iconMat:IsError() then
-                local mdlDir = npc:GetModel()
-                if mdlDir then
-                    iconName = "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png"
-                    iconMat = Material( iconName )
+                iconName = "vgui/entities/" .. npcClass
+                iconMat = Material( iconName )
+
+                if iconMat:IsError() then
+                    local mdlDir = npc:GetModel()
+                    if mdlDir then
+                        iconName = "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png"
+                        iconMat = Material( iconName )
+                    end
                 end
             end
         end
@@ -618,8 +630,10 @@ local function OnEntityCreated( npc )
         end
 
         local npcClass = npc:GetClass()
-        if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
-        if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
+        if !NPCVC_NPCWhitelist[ npcClass ] then
+            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
+            if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
+        end
 
         npc.NPCVC_Initialized = true
         npc.NPCVC_LastEnemy = NULL
