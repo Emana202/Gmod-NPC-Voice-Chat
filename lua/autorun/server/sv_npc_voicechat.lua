@@ -389,11 +389,11 @@ local function GetVoiceLine( ent, voiceType )
     local voicePfp = NPCVC_VoiceProfiles[ ent.NPCVC_VoiceProfile ]
     if voicePfp then
         voiceTbl = voicePfp[ voiceType ]
-        if ( !voiceTbl or #voiceTbl == 0 ) and !vcVoiceProfileFallback:GetBool() then return end
     else
         local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC_VoiceLines ) 
         voiceTbl = voicelineTbl[ voiceType ]
     end
+    if ( !voiceTbl or #voiceTbl == 0 ) and ( !voicePfp or !vcVoiceProfileFallback:GetBool() ) then return end
 
     randomseed( ent:EntIndex() + ent:GetCreationID() + RealTime() )
     return voiceTbl[ random( #voiceTbl ) ]
@@ -485,7 +485,9 @@ local function GetNPCEnemy( npc )
 
     local getEneFunc = npc.GetEnemy
     if !getEneFunc then getEneFunc = npc.GetTarget end
-    return ( getEneFunc and getEneFunc( npc ) or ( npc.CurrentTarget or npc.Enemy or npc.Target or NULL ) )
+    if getEneFunc then return getEneFunc( npc ) end
+
+    return ( npc.CurrentTarget or npc.Enemy or npc.Target or NULL )
 end
 
 local tf2BotsDispTranslation = {
@@ -600,7 +602,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 end
             end
 
-            if witnessLines and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 90000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
+            if witnessLines and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
                 PlaySoundFile( npc, ( ( GetNPCDisposition( npc, ent ) == D_LI and random( 1, 4 ) == 1 ) and "panic" or "witness" ) )
                 continue
             end
@@ -1082,7 +1084,7 @@ local function OnServerThink()
 end
 
 local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
-    if !tookDamage or !ent.NPCVC_Initialized or ent:GetClass() == "npc_antlion_grub" then return end
+    if !tookDamage or !IsValid( ent ) or !ent.NPCVC_Initialized or ent:GetClass() == "npc_antlion_grub" then return end
     local playPanicSnd = false
 
     if !ent.NPCVC_IsLowHealth then
