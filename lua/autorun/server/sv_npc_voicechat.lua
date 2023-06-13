@@ -12,6 +12,7 @@ local table_Empty = table.Empty
 local table_Merge = table.Merge
 local cvarFlag = ( FCVAR_ARCHIVE + FCVAR_REPLICATED )
 local RealTime = RealTime
+local os_time = os.time
 local Rand = math.Rand
 local band = bit.band
 local PointContents = util.PointContents
@@ -89,6 +90,8 @@ local nonNPCNPCs = {
     [ "cycler_actor" ] = true,
     [ "npc_launcher" ] = true,
     [ "obj_vj_bullseye" ] = true,
+    [ "cycler" ] = true,
+    [ "monster_furniture" ] = true,
     [ "animprop_generic" ] = true,
     [ "animprop_generic_physmodel" ] = true,
     [ "monster_generic" ] = true
@@ -111,6 +114,7 @@ local npcIconHeights = {
     [ "monster_turret" ] = -60,
     [ "monster_miniturret" ] = -60,
     [ "npc_barnacle" ] = -64,
+    [ "monster_barnacle" ] = -64,
     [ "npc_combine_camera" ] = -70,
     [ "npc_turret_ceiling" ] = -70,
     [ "npc_manhack" ] = 24,
@@ -148,9 +152,6 @@ local hlsNPCs = {
     [ "monster_turret" ] = true,
     [ "monster_miniturret" ] = true,
     [ "monster_sentry" ] = true
-}
-local npcPurePanicScheds = {
-    [ GetScheduleID( "SCHED_ANTLION_FLIP" ) ] = true
 }
 local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist" }
 local ignoreGagTypes = {
@@ -200,8 +201,8 @@ local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", 
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
-local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "100", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "100", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMin                = CreateConVar( "sv_npcvoicechat_voicepitch_min", "95", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max", "105", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
@@ -336,7 +337,7 @@ net.Receive( "npcsqueakers_sndduration", function()
 end )
 
 net.Receive( "npcsqueakers_resetsettings", function()
-    local cvarCount = net.ReadUInt( 6 )
+    local cvarCount = net.ReadUInt( 8 )
     for i = 1, cvarCount do
         local cvarName = net.ReadString()
         local convar = GetConVar( cvarName )
@@ -395,7 +396,7 @@ local function GetVoiceLine( ent, voiceType )
     end
     if ( !voiceTbl or #voiceTbl == 0 ) and ( !voicePfp or !vcVoiceProfileFallback:GetBool() ) then return end
 
-    randomseed( ent:EntIndex() + ent:GetCreationID() + RealTime() )
+    randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + RealTime() ) -- Trust me, this will work :)
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
@@ -573,7 +574,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
             locAttacker = npc
         end
 
-        if locAttacker == npc then
+        if locAttacker == npc or locAttacker:IsWorld() then
             if killLines and npc.NPCVC_LastValidEnemy == ent and !IsSpeaking( npc, "laugh" ) and !IsSpeaking( npc, "kill" ) then
                 PlaySoundFile( npc, ( random( 1, 6 ) == 1 and "laugh" or "kill" ) )
                 continue
@@ -644,7 +645,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_InPanicState = false
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastSeenEnemyTime = 0
-        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 10 ) )
+        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 10 ) )
         npc.NPCVC_NextDangerSoundTime = 0
         npc.NPCVC_LastVoiceLine = ""
 
@@ -654,7 +655,7 @@ local function OnEntityCreated( npc )
         else
             local height = ( npcIconHeights[ npcClass ] or ( npc:OBBMaxs().z + 10 )  )
             npc.NPCVC_VoiceIconHeight = height
-            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.5, 2.5 )
+            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.33, 2.5 )
         end
 
         if !npc.NPCVC_IsDuplicated then
@@ -915,9 +916,14 @@ local function OnServerThink()
                     end
                 elseif lifeState == 0 then
                     local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
+                    if !barnacled then
+                        local curAct = npc:GetSequenceActivityName( npc:GetSequence() )
+                        barnacled = ( curAct == "ACT_BARNACLE_PULL" or curAct == "ACT_BARNACLE_CHEW" or curAct == "ACT_BARNACLE_CHOMP" )
+                    end
+
                     local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
                     if isPurelyPanic then
-                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or npcPurePanicScheds[ ( npc:GetCurrentSchedule() + 1000000000 ) ] ) )
+                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or ( npc:GetCurrentSchedule() + 1000000000 ) == GetScheduleID( "SCHED_ANTLION_FLIP" ) ) )
 
                         local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
                         if !isPurelyPanic and engineStallT then isPurelyPanic = ( engineStallT > 0.5 ) end
@@ -945,7 +951,7 @@ local function OnServerThink()
                                 local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
                                 if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
                                     for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
-                                        if !IsValid( barn ) or barn:Health() <= 0 or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
+                                        if !IsValid( barn ) or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
 
                                         local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
                                         if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
@@ -1109,10 +1115,12 @@ local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
 end
 
 local function OnAcceptInput( ent, input, activator, caller, value )
-    if !ent.NPCVC_Initialized then return end
+    if !IsValid( ent ) or !ent.NPCVC_Initialized or IsSpeaking( ent, "death" ) then return end
 
     if input == "BecomeRagdoll" then
         OnNPCKilled( ent, activator, caller, true )
+    elseif input == "Kill" and ent:GetClass() != "monster_gman" then
+        OnNPCKilled( ent, activator, caller )
     end
 end
 

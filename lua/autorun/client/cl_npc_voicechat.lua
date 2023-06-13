@@ -52,8 +52,9 @@ local npcNameBgColor    = Color( 72, 72, 72 )
 local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcGlobalVC        = CreateClientConVar( "cl_npcvoicechat_globalvoicechat", "0", nil, nil, "If the NPC voices can be heard globally", 0, 1 )
 local vcPlayVol         = CreateClientConVar( "cl_npcvoicechat_playvolume", "1", nil, nil, "The sound volume of NPC voices", 0 )
-local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "250", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
+local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "300", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
 local vcShowIcon        = CreateClientConVar( "cl_npcvoicechat_showvoiceicon", "1", nil, nil, "If a voice icon should appear above NPC while they're speaking?", 0, 1 )
+local vcScaleIcon       = CreateClientConVar( "cl_npcvoicechat_scaleicon", "1", nil, nil, "If voice icons should scale with their owner's sizes", 0, 1 )
 local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "1", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
 local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "0", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
@@ -136,7 +137,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
 
         local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
-        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.75, 1 ), 0 )
+        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.4, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
         snd:Play()
 
         NPCVC_SoundEmitters[ #NPCVC_SoundEmitters + 1 ] = {
@@ -242,7 +243,7 @@ local function UpdateSounds()
                 if is3D then
                     snd:Set3DEnabled( true )
                     snd:SetPos( lastPos )
-                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.75, 1 ) ), 0 )
+                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.4, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
@@ -265,7 +266,18 @@ local function DrawVoiceIcons()
         ang:RotateAroundAxis( ang:Forward(), 90 )
 
         local pos = ( sndData.LastPlayPos + vector_up * sndData.IconHeight )
-        Start3D2D( pos, ang, 1 )
+        local scale = max( 0.66, 1 * ( vcScaleIcon:GetBool() and sndData.VolumeMult or 1 ) )
+        if scale > 1 then 
+            local ent = sndData.Entity
+            if IsValid( ent ) then
+                local srcEnt = GetSoundSource( ent )
+                if IsValid( srcEnt ) and !srcEnt:IsRagdoll() then
+                    pos = ( pos + vector_up * ( 24 * ( scale - 1 ) ) )
+                end
+            end 
+        end
+
+        Start3D2D( pos, ang, scale )
             surface_SetDrawColor( 255, 255, 255 )
             surface_SetMaterial( voiceIconMat )
             surface_DrawTexturedRect( -8, -8, 16, 16 )
@@ -950,7 +962,7 @@ local function ResetServerSettings( ply )
     if !ply:IsSuperAdmin() then return end
 
     net.Start( "npcsqueakers_resetsettings" )
-        net.WriteUInt( table.Count( NPCVC_ServerSettings ), 6 )
+        net.WriteUInt( table.Count( NPCVC_ServerSettings ), 8 )
         for cvarName, _ in pairs( NPCVC_ServerSettings ) do
             net.WriteString( cvarName )
         end
@@ -1005,7 +1017,10 @@ local function PopulateToolMenu()
         else
             setting = panel[ type ]( panel, label, convar )
         end
-        if helpText then ColoredControlHelp( client, panel, helpText ) end
+        
+        local descText = "ConVar: " .. convar
+        if helpText then descText = helpText .. "\n" .. descText end
+        ColoredControlHelp( client, panel, descText ) 
 
         local cvar = GetConVar( convar )
         if client then
@@ -1033,7 +1048,7 @@ local function PopulateToolMenu()
 
         local clVoicePfps = GetComboBoxVoiceProfiles( panel, false, "cl_npcvoicechat_spawnvoiceprofile" )
         NPCVC_ClientSettings[ #NPCVC_ClientSettings + 1 ] = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" )
-        ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
+        ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside\nConVar: cl_npcvoicechat_spawnvoiceprofile" )
 
         AddSettingsPanel( panel, true, "CheckBox", "Global Voice Chat", "cl_npcvoicechat_globalvoicechat", "If NPC's voice chat can be heard globally and not in 3D" )
         AddSettingsPanel( panel, true, "CheckBox", "Display Voice Icon", "cl_npcvoicechat_showvoiceicon", "If a voice icon should appear above NPC while they're speaking or using voicechat" )
@@ -1127,7 +1142,7 @@ local function PopulateToolMenu()
 
         local svVoicePfps = GetComboBoxVoiceProfiles( panel, false, "sv_npcvoicechat_spawnvoiceprofile" )
         NPCVC_ServerSettings[ "sv_npcvoicechat_spawnvoiceprofile" ] = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" )
-        ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
+        ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one\nConVar: sv_npcvoicechat_spawnvoiceprofile" )
 
         AddSettingsPanel( panel, false, "NumSlider", "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn", {
             max = 100
