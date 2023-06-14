@@ -553,7 +553,7 @@ local function GetNPCProfilePicture( npc )
         if !iconMat:IsError() then
             profilePic = iconName
             NPCVC_CachedNPCPfps[ cacheType ] = iconName
-        else
+        elseif profilePic == nil then
             NPCVC_CachedNPCPfps[ cacheType ] = false
         end
     end
