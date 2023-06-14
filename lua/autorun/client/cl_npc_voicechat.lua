@@ -442,6 +442,70 @@ local function OpenClassSpecificVPs( ply )
     local npcList = list_Get( "NPC" )
     local changedSomething = false
 
+    local function AssignVPToClass( class, prettyName, npcPanel )
+        PlaySound( "buttons/lightswitch2.wav" )
+
+        local vpSelectFrame = vgui_Create( "DFrame" )
+        vpSelectFrame:SetSize( 300, 100 )
+        vpSelectFrame:SetSizable( true )
+        vpSelectFrame:SetTitle( "Voice Profile Assigment" )
+        vpSelectFrame:SetDeleteOnClose( true )
+        vpSelectFrame:SetBackgroundBlur( true )
+        vpSelectFrame:Center()
+        vpSelectFrame:MakePopup()
+
+        local infoLabel = vgui_Create( "DLabel", vpSelectFrame )
+        infoLabel:SetText( "Select the voice profile you want to assign to this NPC class." )
+        infoLabel:Dock( TOP )
+
+        local vpSelection = vgui_Create( "DComboBox", vpSelectFrame )
+        vpSelection:Dock( TOP )
+        vpSelection:SetValue( "None" )
+
+        vpSelection:AddChoice( "None", "" )
+        for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
+            vpSelection:AddChoice( prefix .. vp, vp )
+        end
+
+        local doneButton = vgui_Create( "DButton", vpSelectFrame )
+        doneButton:Dock( BOTTOM )
+        doneButton:SetText( "Done" )
+
+        function doneButton:DoClick()
+            local vpName, vpSelected = vpSelection:GetSelected()
+            if vpSelected and #vpSelected != 0 then 
+                PlaySound( "buttons/button15.wav" )
+                notification_AddLegacy( "Successfully assigned " .. ( prettyName or class ) .. "'s voice profile to " .. vpName .. "!", 0, 4 )
+
+                npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), vpSelected, class )
+                if npcPanel then npcPanel:Remove() end
+                changedSomething = true
+            end
+
+            vpSelectFrame:Remove()
+        end
+    end
+
+    local textEntry = vgui_Create( "DTextEntry", npcListPanel )
+    textEntry:SetPlaceholderText( "Enter NPC's class here if it's not on the list" )
+    textEntry:Dock( BOTTOM )
+
+    function textEntry:OnEnter( class )
+        if !class or #class == 0 then return end
+        class = lower( class )
+        textEntry:SetText( "" )
+
+        for _, line in ipairs( npcListPanel:GetLines() ) do
+            if lower( line:GetColumnText( 2 ) ) != class then continue end
+            PlaySound( "buttons/button11.wav" )
+            notification_AddLegacy( "The class is already registered in the list!", 1, 4 )
+            return
+        end
+
+        PlaySound( "buttons/lightswitch2.wav" )
+        AssignVPToClass( class )
+    end
+
     local function AddNPCPanel( class )
         for _, v in pairs( npcIconLayout:GetChildren() ) do 
             if v:GetNPC() == class then return end 
@@ -472,47 +536,7 @@ local function OpenClassSpecificVPs( ply )
         npcName:Dock( TOP )
 
         function npcImg:DoClick()
-            PlaySound( "buttons/lightswitch2.wav" )
-
-            local vpSelectFrame = vgui_Create( "DFrame" )
-            vpSelectFrame:SetSize( 300, 100 )
-            vpSelectFrame:SetSizable( true )
-            vpSelectFrame:SetTitle( "Voice Profile Assigment" )
-            vpSelectFrame:SetDeleteOnClose( true )
-            vpSelectFrame:SetBackgroundBlur( true )
-            vpSelectFrame:Center()
-            vpSelectFrame:MakePopup()
-
-            local infoLabel = vgui_Create( "DLabel", vpSelectFrame )
-            infoLabel:SetText( "Select the voice profile you want to assign to this NPC class." )
-            infoLabel:Dock( TOP )
-
-            local vpSelection = vgui_Create( "DComboBox", vpSelectFrame )
-            vpSelection:Dock( TOP )
-            vpSelection:SetValue( "None" )
-
-            vpSelection:AddChoice( "None", "" )
-            for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
-                vpSelection:AddChoice( prefix .. vp, vp )
-            end
-
-            local doneButton = vgui_Create( "DButton", vpSelectFrame )
-            doneButton:Dock( BOTTOM )
-            doneButton:SetText( "Done" )
-
-            function doneButton:DoClick()
-                local vpName, vpSelected = vpSelection:GetSelected()
-                if vpSelected and #vpSelected != 0 then 
-                    PlaySound( "buttons/button15.wav" )
-                    notification_AddLegacy( "Successfully assigned " .. prettyName .. "'s voice profile to " .. vpName .. "!", 0, 4 )
-
-                    npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), vpSelected, class )
-                    npcPanel:Remove()
-                    changedSomething = true
-                end
-
-                vpSelectFrame:Remove()
-            end
+            AssignVPToClass( class, prettyName, npcPanel )
         end
 
         function npcPanel:GetNPC() 
@@ -526,9 +550,11 @@ local function OpenClassSpecificVPs( ply )
 
     function npcListPanel:OnRowRightClick( id, line )
         PlaySound( "buttons/combine_button3.wav" )
-        AddNPCPanel( line:GetColumnText( 3 ) )
-        self:RemoveLine( id )
         changedSomething = true
+        
+        local class = line:GetColumnText( 3 )
+        if npcList[ class ] then AddNPCPanel( class ) end
+        self:RemoveLine( id )
     end
 
     function frame:OnClose()
@@ -558,9 +584,7 @@ local function OpenClassSpecificVPs( ply )
 
         for class, vp in pairs( data ) do
             local listData = npcList[ class ]
-            if !listData then continue end
-
-            local prettyName = listData.Name
+            local prettyName = ( listData and listData.Name )
             npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), vp, class )
 
             for _, npcPanel in pairs( npcIconLayout:GetChildren() ) do
@@ -607,8 +631,30 @@ local function OpenNPCBlacklisting( ply )
     npcListPanel:Dock( LEFT )
     npcListPanel:AddColumn( "NPC", 1 )
 
+    local textEntry = vgui_Create( "DTextEntry", npcListPanel )
+    textEntry:SetPlaceholderText( "Enter NPC's class here if it's not on the list" )
+    textEntry:Dock( BOTTOM )
+
     local npcList = list_Get( "NPC" )
     local changedSomething = false
+
+    function textEntry:OnEnter( class )
+        if !class or #class == 0 then return end
+        class = lower( class )
+        textEntry:SetText( "" )
+
+        for _, line in ipairs( npcListPanel:GetLines() ) do
+            if lower( line:GetColumnText( 2 ) ) != class then continue end
+            PlaySound( "buttons/button11.wav" )
+            notification_AddLegacy( "The class is already registered in the list!", 1, 4 )
+            return
+        end
+
+        PlaySound( "buttons/lightswitch2.wav" )
+        local prettyName = ( npcList[ class ] and npcList[ class ].Name or false )
+        changedSomething = true
+        npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
+    end
 
     local function AddNPCPanel( class )
         for _, v in pairs( npcIconLayout:GetChildren() ) do 
@@ -657,9 +703,11 @@ local function OpenNPCBlacklisting( ply )
 
     function npcListPanel:OnRowRightClick( id, line )
         PlaySound( "buttons/combine_button3.wav" )
-        AddNPCPanel( line:GetColumnText( 2 ) )
-        self:RemoveLine( id )
         changedSomething = true
+
+        local class = line:GetColumnText( 2 )
+        if npcList[ class ] then AddNPCPanel( class ) end
+        self:RemoveLine( id )
     end
 
     function frame:OnClose()
@@ -689,9 +737,7 @@ local function OpenNPCBlacklisting( ply )
 
         for class, vp in pairs( data ) do
             local listData = npcList[ class ]
-            if !listData then continue end
-
-            local prettyName = listData.Name
+            local prettyName = ( listData and listData.Name )
             npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
 
             for _, npcPanel in pairs( npcIconLayout:GetChildren() ) do
@@ -738,8 +784,74 @@ local function OpenNPCWhitelisting( ply )
     npcListPanel:Dock( LEFT )
     npcListPanel:AddColumn( "NPC", 1 )
 
+    local textEntry = vgui_Create( "DTextEntry", npcListPanel )
+    textEntry:SetPlaceholderText( "Enter NPC's class here if it's not on the list" )
+    textEntry:Dock( BOTTOM )
+
     local npcList = list_Get( "NPC" )
     local changedSomething = false
+
+    function textEntry:OnEnter( class )
+        if !class or #class == 0 then return end
+        class = lower( class )
+        textEntry:SetText( "" )
+
+        for _, line in ipairs( npcListPanel:GetLines() ) do
+            if lower( line:GetColumnText( 2 ) ) != class then continue end
+            PlaySound( "buttons/button11.wav" )
+            notification_AddLegacy( "The class is already registered in the list!", 1, 4 )
+            return
+        end
+        PlaySound( "buttons/lightswitch2.wav" )
+
+        local prettyName = ( npcList[ class ] and npcList[ class ].Name or false )
+        if prettyName == false then
+            local vtSelectFrame = vgui_Create( "DFrame" )
+            vtSelectFrame:SetSize( 300, 125 )
+            vtSelectFrame:SetSizable( true )
+            vtSelectFrame:SetTitle( "Idle Voice Type Assigment" )
+            vtSelectFrame:SetDeleteOnClose( true )
+            vtSelectFrame:SetBackgroundBlur( true )
+            vtSelectFrame:Center()
+            vtSelectFrame:MakePopup()
+
+            local infoLabel = vgui_Create( "DLabel", vtSelectFrame )
+            infoLabel:SetText( "It seems that you're registering a non-standart NPC." )
+            infoLabel:Dock( TOP )
+
+            local infoLabel2 = vgui_Create( "DLabel", vtSelectFrame )
+            infoLabel2:SetText( "Select the voice type this NPC will use while idling." )
+            infoLabel2:Dock( TOP )
+
+            local voiceType = vgui_Create( "DComboBox", vtSelectFrame )
+            voiceType:Dock( TOP )
+            voiceType:SetValue( "Idle" )
+
+            voiceType:AddChoice( "Idle", "idle" )
+            voiceType:AddChoice( "Taunt", "taunt" )
+            voiceType:AddChoice( "Death", "death" )
+            voiceType:AddChoice( "Kill", "kill" )
+            voiceType:AddChoice( "Laugh", "laugh" )
+            voiceType:AddChoice( "Witness", "witness" )
+            voiceType:AddChoice( "Assist", "assist" )
+            voiceType:AddChoice( "Panic", "panic" )
+
+            local doneButton = vgui_Create( "DButton", vtSelectFrame )
+            doneButton:Dock( BOTTOM )
+            doneButton:SetText( "Done" )
+
+            function doneButton:DoClick()
+                local _, selectedType = voiceType:GetSelected()
+                PlaySound( "buttons/button15.wav" )
+                npcListPanel:AddLine( class, class, selectedType )
+                changedSomething = true
+                vtSelectFrame:Remove()
+            end
+        else
+            changedSomething = true
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class, true )
+        end
+    end
 
     local function AddNPCPanel( class )
         for _, v in pairs( npcIconLayout:GetChildren() ) do 
@@ -772,7 +884,7 @@ local function OpenNPCWhitelisting( ply )
 
         function npcImg:DoClick()
             PlaySound( "buttons/lightswitch2.wav" )
-            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class, true )
             npcPanel:Remove()
             changedSomething = true
         end
@@ -788,9 +900,11 @@ local function OpenNPCWhitelisting( ply )
 
     function npcListPanel:OnRowRightClick( id, line )
         PlaySound( "buttons/combine_button3.wav" )
-        AddNPCPanel( line:GetColumnText( 2 ) )
-        self:RemoveLine( id )
         changedSomething = true
+        
+        local class = line:GetColumnText( 2 )
+        if npcList[ class ] then AddNPCPanel( class ) end
+        self:RemoveLine( id )
     end
 
     function frame:OnClose()
@@ -800,8 +914,10 @@ local function OpenNPCWhitelisting( ply )
         end
 
         local classes = {}
-        for _, line in pairs( npcListPanel:GetLines() ) do 
-            classes[ line:GetColumnText( 2 )  ] = true
+        for _, line in ipairs( npcListPanel:GetLines() ) do
+            local idleVoice = line:GetColumnText( 3 )
+            if !idleVoice or idleVoice == "" then idleVoice = true end
+            classes[ line:GetColumnText( 2 )  ] = idleVoice
         end
 
         net.Start( "npcsqueakers_writedata" )
@@ -818,12 +934,10 @@ local function OpenNPCWhitelisting( ply )
         local data = JSONToTable( net.ReadString() )
         if !data then return end
 
-        for class, vp in pairs( data ) do
+        for class, idleVoice in pairs( data ) do
             local listData = npcList[ class ]
-            if !listData then continue end
-
-            local prettyName = listData.Name
-            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class )
+            local prettyName = ( listData and listData.Name )
+            npcListPanel:AddLine( ( prettyName and prettyName .. " (" .. class .. ")" or class ), class, idleVoice )
 
             for _, npcPanel in pairs( npcIconLayout:GetChildren() ) do
                 if npcPanel:GetNPC() == class then npcPanel:Remove() break end 
@@ -1052,6 +1166,7 @@ local function PopulateToolMenu()
 
         AddSettingsPanel( panel, true, "CheckBox", "Global Voice Chat", "cl_npcvoicechat_globalvoicechat", "If NPC's voice chat can be heard globally and not in 3D" )
         AddSettingsPanel( panel, true, "CheckBox", "Display Voice Icon", "cl_npcvoicechat_showvoiceicon", "If a voice icon should appear above NPC while they're speaking or using voicechat" )
+        AddSettingsPanel( panel, true, "CheckBox", "Scale Voice Icon", "cl_npcvoicechat_scaleicon", "If voice icons should scale with their owner's sizes" )
         AddSettingsPanel( panel, true, "CheckBox", "Display Voice Popups", "cl_npcvoicechat_showpopups", "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
         AddSettingsPanel( panel, true, "CheckBox", "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp", "If the NPC's voice popup should draw its profile picture" )
 

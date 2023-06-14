@@ -17,6 +17,7 @@ local Rand = math.Rand
 local band = bit.band
 local PointContents = util.PointContents
 local TraceLine = util.TraceLine
+local IsValidProp = util.IsValidProp
 local ents_GetAll = ents.GetAll
 local FindByClass = ents.FindByClass
 local CurTime = CurTime
@@ -91,6 +92,8 @@ local nonNPCNPCs = {
     [ "npc_launcher" ] = true,
     [ "obj_vj_bullseye" ] = true,
     [ "cycler" ] = true,
+    [ "generic_actor" ] = true,
+    [ "npc_vehicledriver" ] = true,
     [ "monster_furniture" ] = true,
     [ "animprop_generic" ] = true,
     [ "animprop_generic_physmodel" ] = true,
@@ -456,7 +459,9 @@ end
 local function StopSpeaking( npc, voiceType )
     if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
-    if IsValid( sndEmitter ) then sndEmitter:Remove() end
+    if !IsValid( sndEmitter ) then return end
+    sndEmitter:Remove()
+    sndEmitter.SpeechPlayTime = 0
 end
 
 local function IsSpeaking( npc, voiceType )
@@ -522,7 +527,10 @@ local function GetNPCProfilePicture( npc )
     end
 
     local npcClass = npc:GetClass()
-    local profilePic = NPCVC_CachedNPCPfps[ npcClass ]
+    local npcModel = npc:GetModel()
+
+    local cacheType = ( ( npcModel and #npcModel != 0 ) and npcModel or npcClass )
+    local profilePic = NPCVC_CachedNPCPfps[ cacheType ]
     if profilePic == nil or profilePic != false then
         local iconName = "entities/" .. npcClass .. ".png"
         local iconMat = Material( iconName )
@@ -535,23 +543,21 @@ local function GetNPCProfilePicture( npc )
                 iconName = "vgui/entities/" .. npcClass
                 iconMat = Material( iconName )
 
-                if iconMat:IsError() then
-                    local mdlDir = npc:GetModel()
-                    if mdlDir then
-                        iconName = "spawnicons/".. string_sub( mdlDir, 1, #mdlDir - 4 ).. ".png"
-                        iconMat = Material( iconName )
-                    end
+                if cacheType == npcModel and iconMat:IsError() then
+                    iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
+                    iconMat = Material( iconName )
                 end
             end
         end
 
         if !iconMat:IsError() then
             profilePic = iconName
-            NPCVC_CachedNPCPfps[ npcClass ] = iconName
+            NPCVC_CachedNPCPfps[ cacheType ] = iconName
         else
-            NPCVC_CachedNPCPfps[ npcClass ] = false
+            NPCVC_CachedNPCPfps[ cacheType ] = false
         end
     end
+
     return profilePic
 end
 
@@ -633,7 +639,8 @@ local function OnEntityCreated( npc )
         end
 
         local npcClass = npc:GetClass()
-        if !NPCVC_NPCWhitelist[ npcClass ] then
+        local whitelistVoice = NPCVC_NPCWhitelist[ npcClass ]
+        if !whitelistVoice then
             if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
         end
@@ -648,6 +655,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 10 ) )
         npc.NPCVC_NextDangerSoundTime = 0
         npc.NPCVC_LastVoiceLine = ""
+        npc.NPCVC_IdleVoiceType = ( whitelistVoice != true and whitelistVoice or "idle" )
 
         if npc.LastPathingInfraction then
             npc.NPCVC_VoiceIconHeight = 138
@@ -922,11 +930,20 @@ local function OnServerThink()
                     end
 
                     local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
+                    local stopSpeech = ( rolledSpeech == true )
                     if isPurelyPanic then
-                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !ignorePlys:GetBool() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or ( npc:GetCurrentSchedule() + 1000000000 ) == GetScheduleID( "SCHED_ANTLION_FLIP" ) ) )
+                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or ( npc:GetCurrentSchedule() + 1000000000 ) == GetScheduleID( "SCHED_ANTLION_FLIP" ) ) )
 
                         local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
                         if !isPurelyPanic and engineStallT then isPurelyPanic = ( engineStallT > 0.5 ) end
+
+                        if !isPurelyPanic then
+                            local phys = npc:GetPhysicsObject()
+                            if IsValid( phys ) and phys:GetVelocity():Length() >= 500 and IsValidProp( npc:GetModel() ) then
+                                isPurelyPanic = true
+                                stopSpeech = true
+                            end
+                        end
 
                         if !isPurelyPanic and drownNPCs[ npcClass ] then
                             waterCheckTr.start = npc:WorldSpaceCenter()
@@ -963,7 +980,7 @@ local function OnServerThink()
                             end )
                         end               
                     else
-                        if rolledSpeech and npc.NPCVC_InPanicState then
+                        if stopSpeech and npc.NPCVC_InPanicState then
                             StopSpeaking( npc, "panic" )
 
                             if IsValid( curEnemy ) and vcAllowLines_CombatIdle:GetBool() then
@@ -1068,7 +1085,7 @@ local function OnServerThink()
                                             PlaySoundFile( npc, combatLine )
                                         end
                                     elseif vcAllowLines_Idle:GetBool() then
-                                        PlaySoundFile( npc, "idle" )
+                                        PlaySoundFile( npc, npc.NPCVC_IdleVoiceType )
                                     end
                                 end
                             end
@@ -1094,7 +1111,7 @@ local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
     local playPanicSnd = false
 
     if !ent.NPCVC_IsLowHealth then
-        local hpThreshold = Rand( 0.1, 0.33 )
+        local hpThreshold = Rand( 0.1, 0.4 )
         if ent:Health() <= ( ent:GetMaxHealth() * hpThreshold ) then
             playPanicSnd = true
             ent.NPCVC_IsLowHealth = hpThreshold
@@ -1124,6 +1141,11 @@ local function OnAcceptInput( ent, input, activator, caller, value )
     end
 end
 
+local function OnPropBreak( attacker, prop )
+    if !IsValid( prop ) or !prop.NPCVC_Initialized or IsSpeaking( prop, "death" ) then return end
+    OnNPCKilled( prop, attacker )
+end
+
 local function OnServerShutDown()
     if !vcSaveNPCDataOnMapChange:GetBool() then
         local mapSavedNPCs = file_Read( "npcvoicechat/mapsavednpcs.json", "DATA" )
@@ -1141,4 +1163,5 @@ hook.Add( "CreateEntityRagdoll", "NPCSqueakers_OnCreateEntityRagdoll", OnCreateE
 hook.Add( "Think", "NPCSqueakers_OnServerThink", OnServerThink )
 hook.Add( "PostEntityTakeDamage", "NPCSqueakers_OnPostEntityTakeDamage", OnPostEntityTakeDamage )
 hook.Add( "AcceptInput", "NPCSqueakers_OnAcceptInput", OnAcceptInput )
+hook.Add( "PropBreak", "NPCSqueakers_OnPropBreak", OnPropBreak )
 hook.Add( "ShutDown", "NPCSqueakers_OnServerShutDown", OnServerShutDown )
