@@ -135,6 +135,7 @@ local npcIconHeights = {
 }
 local hlsNPCs = {
     [ "monster_alien_grunt" ] = true,
+    [ "monster_barnacle" ] = true,
     [ "monster_nihilanth" ] = true,
     [ "monster_tentacle" ] = true,
     [ "monster_alien_slave" ] = true,
@@ -404,7 +405,7 @@ local function GetVoiceLine( ent, voiceType )
 end
 
 local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
-    if !npc.NPCVC_Initialized or NPCVC_NPCBlacklist[ npc:GetClass() ] then return end
+    if !npc.NPCVC_Initialized or npc.NPCVC_InDeadState or NPCVC_NPCBlacklist[ npc:GetClass() ] then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
@@ -529,8 +530,13 @@ local function GetNPCProfilePicture( npc )
     local npcClass = npc:GetClass()
     local npcModel = npc:GetModel()
 
-    local cacheType = ( ( npcModel and #npcModel != 0 ) and npcModel or npcClass )
+    local cacheType = npcModel
     local profilePic = NPCVC_CachedNPCPfps[ cacheType ]
+    if !profilePic then
+        cacheType = npcClass
+        profilePic = NPCVC_CachedNPCPfps[ cacheType ]
+    end
+
     if profilePic == nil or profilePic != false then
         local iconName = "entities/" .. npcClass .. ".png"
         local iconMat = Material( iconName )
@@ -543,7 +549,7 @@ local function GetNPCProfilePicture( npc )
                 iconName = "vgui/entities/" .. npcClass
                 iconMat = Material( iconName )
 
-                if cacheType == npcModel and iconMat:IsError() then
+                if npcModel and #npcModel != 0 and iconMat:IsError() then
                     iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
                     iconMat = Material( iconName )
                 end
@@ -580,19 +586,18 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
             locAttacker = npc
         end
 
-        if locAttacker == npc or locAttacker:IsWorld() then
+        if locAttacker == npc then
             if killLines and npc.NPCVC_LastValidEnemy == ent and !IsSpeaking( npc, "laugh" ) and !IsSpeaking( npc, "kill" ) then
                 PlaySoundFile( npc, ( random( 1, 6 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
         elseif attackPos and random( 1, 3 ) != 1 then
-            if locAttacker == ent and !IsSpeaking( npc, "laugh" ) then
+            if ( locAttacker == ent or locAttacker:IsWorld() ) and !IsSpeaking( npc, "laugh" ) then
                 PlaySoundFile( npc, "laugh" )
                 continue
             end
 
             local npcPos = npc:GetPos()
-            
             if GetNPCDisposition( npc, locAttacker ) != D_HT then 
                 if assistLines and attackPos:DistToSqr( npcPos ) <= 562500 and !IsSpeaking( npc, "assist" ) then
                     local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
@@ -609,8 +614,9 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 end
             end
 
-            if witnessLines and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
-                PlaySoundFile( npc, ( ( GetNPCDisposition( npc, ent ) == D_LI and random( 1, 4 ) == 1 ) and "panic" or "witness" ) )
+            local isFriend = ( GetNPCDisposition( npc, ent ) == D_LI )
+            if witnessLines and ( isFriend or random( 1, 3 ) == 1 ) and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
+                PlaySoundFile( npc, ( ( isFriend and random( 1, 3 ) == 1 ) and "panic" or "witness" ) )
                 continue
             end
         end
@@ -650,6 +656,7 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastValidEnemy = NULL
         npc.NPCVC_IsLowHealth = false
         npc.NPCVC_InPanicState = false
+        npc.NPCVC_InDeadState = false
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastSeenEnemyTime = 0
         npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 10 ) )
@@ -792,9 +799,9 @@ local function OnServerThink()
     if aiDisabled:GetBool() then return end
 
     for _, npc in ipairs( ents_GetAll() ) do
-        if !IsValid( npc ) or !npc.NPCVC_Initialized then continue end
+        if !IsValid( npc ) or !npc.NPCVC_Initialized or npc.NPCVC_InDeadState then continue end
+        
         local npcClass = npc:GetClass()
-
         if npcClass == "npc_turret_floor" then 
             local selfDestructing = npc:GetInternalVariable( "m_bSelfDestructing" )
             if !selfDestructing then 
@@ -1136,8 +1143,20 @@ local function OnAcceptInput( ent, input, activator, caller, value )
 
     if input == "BecomeRagdoll" then
         OnNPCKilled( ent, activator, caller, true )
-    elseif input == "Kill" and ent:GetClass() != "monster_gman" then
-        OnNPCKilled( ent, activator, caller )
+        return
+    end
+
+    if hlsNPCs[ ent:GetClass() ] then -- HL:S NPCs only >:(
+        if input == "Kill" or input == "Deactivate"then
+            OnNPCKilled( ent, activator, caller )
+            ent.NPCVC_InDeadState = true
+            return
+        end
+
+        if input == "Activate" and ent.NPCVC_InDeadState then
+            ent.NPCVC_InDeadState = false
+            return
+        end
     end
 end
 
