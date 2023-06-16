@@ -137,7 +137,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
 
         local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
-        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.4, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
+        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.55, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
         snd:Play()
 
         NPCVC_SoundEmitters[ #NPCVC_SoundEmitters + 1 ] = {
@@ -169,7 +169,13 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 local nickPhrase = NPCVC_CachedNamePhrases[ nickName ]
                 if !nickPhrase then
                     nickPhrase = GetPhrase( nickName )
-                    NPCVC_CachedNamePhrases[ nickName ] = nickPhrase
+                    if ( !nickPhrase or nickPhrase == nickName ) and IsValid( srcEnt ) then
+                        local npcName = list_Get( "NPC" )[ srcEnt:GetClass() ]
+                        nickPhrase = ( npcName and npcName.Name or nickPhrase )
+                        if nickPhrase and nickPhrase != nickName then NPCVC_CachedNamePhrases[ nickName ] = nickPhrase end
+                    else
+                        NPCVC_CachedNamePhrases[ nickName ] = nickPhrase
+                    end
                 end
                 nickName = nickPhrase
             end
@@ -243,7 +249,7 @@ local function UpdateSounds()
                 if is3D then
                     snd:Set3DEnabled( true )
                     snd:SetPos( lastPos )
-                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.4, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
+                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.55, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )

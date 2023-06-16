@@ -6,6 +6,7 @@ local SimpleTimer = timer.Simple
 local random = math.random
 local randomseed = math.randomseed
 local string_sub = string.sub
+local string_find = string.find
 local Clamp = math.Clamp
 local abs = math.abs
 local table_Empty = table.Empty
@@ -200,7 +201,8 @@ local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", 
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
-local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon", 0, 1 )
+local vcUseModelIcon            = CreateConVar( "sv_npcvoicechat_usemodelicons", "0", cvarFlag, "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon", 0, 1 )
+local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their spawnmenu icons", 0, 1 )
 local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", "0", cvarFlag, "If NPCs are only allowed to use profile pictures that are placed by players", 0, 1 )
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregagged", "1", cvarFlag, "If NPCs that are gagged aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
@@ -538,20 +540,44 @@ local function GetNPCProfilePicture( npc )
     end
 
     if profilePic == nil or profilePic != false then
-        local iconName = "entities/" .. npcClass .. ".png"
-        local iconMat = Material( iconName )
+        -- Least deranged man's code
+        local iconName, iconMat
+        if vcUseModelIcon:GetBool() then 
+            if npcModel and #npcModel != 0 then
+                iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
+                iconMat = Material( iconName )
+            end
 
-        if iconMat:IsError() then
-            iconName = "entities/" .. npcClass .. ".jpg"
+            if iconMat:IsError() then
+                iconName = "entities/" .. npcClass .. ".png"
+                iconMat = Material( iconName )
+
+                if iconMat:IsError() then
+                    iconName = "entities/" .. npcClass .. ".jpg"
+                    iconMat = Material( iconName )
+
+                    if iconMat:IsError() then
+                        iconName = "vgui/entities/" .. npcClass
+                        iconMat = Material( iconName )
+                    end
+                end
+            end
+        else
+            iconName = "entities/" .. npcClass .. ".png"
             iconMat = Material( iconName )
 
             if iconMat:IsError() then
-                iconName = "vgui/entities/" .. npcClass
+                iconName = "entities/" .. npcClass .. ".jpg"
                 iconMat = Material( iconName )
 
-                if npcModel and #npcModel != 0 and iconMat:IsError() then
-                    iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
+                if iconMat:IsError() then
+                    iconName = "vgui/entities/" .. npcClass
                     iconMat = Material( iconName )
+
+                    if npcModel and #npcModel != 0 and iconMat:IsError() then
+                        iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
+                        iconMat = Material( iconName )
+                    end
                 end
             end
         end
@@ -647,7 +673,7 @@ local function OnEntityCreated( npc )
         local npcClass = npc:GetClass()
         local whitelistVoice = NPCVC_NPCWhitelist[ npcClass ]
         if !whitelistVoice then
-            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] ) then return end
+            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
         end
 
