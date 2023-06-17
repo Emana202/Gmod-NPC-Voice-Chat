@@ -1048,7 +1048,7 @@ local function OnServerThink()
                         if IsValid( curEnemy ) then
                             isPanicking = ( !npc:IsNextBot() and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
 
-                            if ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 then
+                            if curEnemy == lastEnemy and IsValid( lastEnemy ) and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
                                 combatLine = "idle"
                             elseif isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
                                 if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 1000000 or 250000 ) then
