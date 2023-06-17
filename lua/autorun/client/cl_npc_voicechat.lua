@@ -390,9 +390,15 @@ local function DrawVoiceChat()
 end
 
 local function OnCreateClientsideRagdoll( owner, ragdoll )
+    local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
+    if IsValid( sndEmitter ) and sndEmitter.SetSoundSource then 
+        sndEmitter:SetSoundSource( ragdoll ) 
+        return
+    end
+
     SimpleTimer( 0.1, function()
         if !IsValid( owner ) or !IsValid( ragdoll ) then return end
-        local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
+        sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
         if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
     end )
 end
