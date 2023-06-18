@@ -147,6 +147,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             LastPlayPos = playPos,
             VolumeMult = volMult,
             Is3D = is3D,
+            IconHeight = vcData.IconHeight,
             PlayTime = playTime
         }
 
@@ -196,9 +197,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
                 AlphaRatio = ( canDrawRn and 1 or 0 ),
-                PlayTime = playTime,
-                IconHeight = vcData.IconHeight,
                 VolumeMult = volMult,
+                PlayTime = playTime,
                 LastPlayTime = ( canDrawRn and RealTime() or 0 ),
                 FirstDisplayTime = ( canDrawRn and RealTime() or 0 )
             }
@@ -277,8 +277,8 @@ end
 local function DrawVoiceIcons()
     if !vcEnabled:GetBool() or !vcShowIcon:GetBool() then return end
 
-    for _, sndData in pairs( NPCVC.VoicePopups ) do
-        if sndData.PlayTime or !IsValid( sndData.Sound ) then continue end
+    for _, sndData in ipairs( NPCVC.SoundEmitters ) do
+        if sndData.PlayTime then continue end
 
         local ang = EyeAngles()
         ang:RotateAroundAxis( ang:Up(), -90 )
@@ -331,7 +331,7 @@ local function DrawVoiceChat()
                 continue
             end
         end
-
+        
         local ent = vcData.Entity
         local lastPos = vcData.LastPlayPos
         if IsValid( ent ) then 
@@ -344,7 +344,7 @@ local function DrawVoiceChat()
 
         local sndVol = 0
         local snd = vcData.Sound
-        if IsValid( snd ) then
+        if IsValid( snd ) and snd:GetState() == GMOD_CHANNEL_PLAYING then
             local leftChan, rightChan = snd:GetLevel()
             sndVol = ( ( leftChan + rightChan ) * 0.5 )
 
