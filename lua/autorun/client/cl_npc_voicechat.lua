@@ -66,33 +66,34 @@ local vcPopupColorB     = CreateClientConVar( "cl_npcvoicechat_popupcolor_b", "0
 
 CreateClientConVar( "cl_npcvoicechat_spawnvoiceprofile", "", nil, true, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
-NPCVC_SoundEmitters         = NPCVC_SoundEmitters or {}
-NPCVC_CachedNamePhrases     = NPCVC_CachedNamePhrases or {}
-NPCVC_VoicePopups           = {}
-NPCVC_VoiceProfiles         = {}
-NPCVC_CachedMaterials       = {}
+NPCVC                       = NPCVC or {}
+NPCVC.SoundEmitters         = NPCVC.SoundEmitters or {}
+NPCVC.CachedNamePhrases     = NPCVC.CachedNamePhrases or {}
+NPCVC.VoicePopups           = {}
+NPCVC.VoiceProfiles         = {}
+NPCVC.CachedMaterials       = {}
 
 local function UpdateVoiceProfiles()
-    table_Empty( NPCVC_VoiceProfiles )
+    table_Empty( NPCVC.VoiceProfiles )
 
     local _, voicePfpDirs = file_Find( "sound/npcvoicechat/voiceprofiles/*", "GAME" )
     if voicePfpDirs then
         for _, voicePfp in ipairs( voicePfpDirs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = ""
+            NPCVC.VoiceProfiles[ voicePfp ] = ""
         end
     end
 
     local _, lambdaVPs = file_Find( "sound/lambdaplayers/voiceprofiles/*", "GAME" )
     if lambdaVPs then
         for _, voicePfp in ipairs( lambdaVPs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = "[LambdaVP] "
+            NPCVC.VoiceProfiles[ voicePfp ] = "[LambdaVP] "
         end
     end
     
     local _, zetaVPs = file_Find( "sound/zetaplayer/custom_vo/*", "GAME" )
     if zetaVPs then
         for _, voicePfp in ipairs( zetaVPs ) do
-            NPCVC_VoiceProfiles[ voicePfp ] = "[ZetaVP] "
+            NPCVC.VoiceProfiles[ voicePfp ] = "[ZetaVP] "
         end
     end
 end
@@ -108,13 +109,13 @@ local function GetSoundSource( ent )
     return srcEnt, netFunc
 end
 
-local function PlaySoundFile( sndDir, vcData, is3D )
+local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
     local ent = vcData.Emitter
     if !IsValid( ent ) then return end
 
     PlayFile( "sound/" .. sndDir, "noplay" .. ( is3D and "3d" or "" ), function( snd, errorId, errorName )
         if errorId == 21 then
-            PlaySoundFile( sndDir, vcData, false )
+            PlaySoundFile( sndDir, vcData, playDelay, false )
             return
         elseif !IsValid( snd ) then
             print( "NPC Voice Chat Error: Sound file " .. sndDir .. " failed to open!\nError Index: " .. errorName .. "#" .. errorId )
@@ -138,19 +139,19 @@ local function PlaySoundFile( sndDir, vcData, is3D )
         local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
         snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.55, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
-        snd:Play()
 
-        NPCVC_SoundEmitters[ #NPCVC_SoundEmitters + 1 ] = {
+        local playTime = ( RealTime() + playDelay )
+        NPCVC.SoundEmitters[ #NPCVC.SoundEmitters + 1 ] = {
             Entity = ent,
             Sound = snd,
             LastPlayPos = playPos,
-            IconHeight = vcData.IconHeight,
             VolumeMult = volMult,
-            Is3D = is3D
+            Is3D = is3D,
+            PlayTime = playTime
         }
 
         local entIndex = vcData.EntIndex
-        local voicePopup = NPCVC_VoicePopups[ entIndex ]
+        local voicePopup = NPCVC.VoicePopups[ entIndex ]
         if voicePopup then 
             voicePopup.Entity = ent
             voicePopup.Sound = snd
@@ -158,23 +159,23 @@ local function PlaySoundFile( sndDir, vcData, is3D )
         else
             local pfpPic, pfpMat = vcData.ProfilePicture
             if pfpPic then
-                pfpMat = NPCVC_CachedMaterials[ pfpPic ]
+                pfpMat = NPCVC.CachedMaterials[ pfpPic ]
                 if pfpMat == nil then pfpMat = Material( pfpPic ) end
                 if pfpMat and pfpMat:IsError() then pfpMat = nil end
-                NPCVC_CachedMaterials[ pfpPic ] = ( pfpMat or false )
+                NPCVC.CachedMaterials[ pfpPic ] = ( pfpMat or false )
             end
 
             local nickName = vcData.Nickname
             if vcData.UsesRealName then
-                local nickPhrase = NPCVC_CachedNamePhrases[ nickName ]
+                local nickPhrase = NPCVC.CachedNamePhrases[ nickName ]
                 if !nickPhrase then
                     nickPhrase = GetPhrase( nickName )
                     if ( !nickPhrase or nickPhrase == nickName ) and IsValid( srcEnt ) then
                         local npcName = list_Get( "NPC" )[ srcEnt:GetClass() ]
                         nickPhrase = ( npcName and npcName.Name or nickPhrase )
-                        if nickPhrase and nickPhrase != nickName then NPCVC_CachedNamePhrases[ nickName ] = nickPhrase end
+                        if nickPhrase and nickPhrase != nickName then NPCVC.CachedNamePhrases[ nickName ] = nickPhrase end
                     else
-                        NPCVC_CachedNamePhrases[ nickName ] = nickPhrase
+                        NPCVC.CachedNamePhrases[ nickName ] = nickPhrase
                     end
                 end
                 nickName = nickPhrase
@@ -187,7 +188,7 @@ local function PlaySoundFile( sndDir, vcData, is3D )
             displayDist = ( displayDist * displayDist )
             local canDrawRn = ( displayDist == 0 or LocalPlayer():GetPos():DistToSqr( playPos ) <= displayDist )
 
-            NPCVC_VoicePopups[ entIndex ] = {
+            NPCVC.VoicePopups[ entIndex ] = {
                 Nick = nickName,
                 Entity = ent,
                 Sound = snd,
@@ -195,6 +196,9 @@ local function PlaySoundFile( sndDir, vcData, is3D )
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
                 AlphaRatio = ( canDrawRn and 1 or 0 ),
+                PlayTime = playTime,
+                IconHeight = vcData.IconHeight,
+                VolumeMult = volMult,
                 LastPlayTime = ( canDrawRn and RealTime() or 0 ),
                 FirstDisplayTime = ( canDrawRn and RealTime() or 0 )
             }
@@ -202,32 +206,34 @@ local function PlaySoundFile( sndDir, vcData, is3D )
 
         net.Start( "npcsqueakers_sndduration" )
             net.WriteEntity( ent )
-            net.WriteFloat( sndLength / playRate )
+            net.WriteFloat( ( sndLength / playRate ) + playDelay )
         net.SendToServer()
     end )
 end
 
 net.Receive( "npcsqueakers_playsound", function()
-    PlaySoundFile( net.ReadString(), net.ReadTable(), true )
+    PlaySoundFile( net.ReadString(), net.ReadTable(), net.ReadFloat(), true )
 end )
 
 local function UpdateSounds()
-    if #NPCVC_SoundEmitters == 0 then return end
+    if #NPCVC.SoundEmitters == 0 then return end
 
     local enabled = vcEnabled:GetBool()
     local volume = vcPlayVol:GetFloat()
     local fadeDist = vcPlayDist:GetInt()
     local isGlobal = vcGlobalVC:GetBool()
     local plyPos = LocalPlayer():GetPos()
+    local realTime = RealTime()
 
-    for index, sndData in ipairs( NPCVC_SoundEmitters ) do
+    for index, sndData in ipairs( NPCVC.SoundEmitters ) do
         local ent = sndData.Entity
         local snd = sndData.Sound
         local srcEnt, netFunc = ( IsValid( ent ) and GetSoundSource( ent ) )
+        local playTime = sndData.PlayTime
 
-        if !IsValid( ent ) or !IsValid( snd ) or snd:GetState() == GMOD_CHANNEL_STOPPED or netFunc and !IsValid( srcEnt ) and ent:GetRemoveOnNoSource() then
+        if !IsValid( ent ) or !IsValid( snd ) or !playTime and snd:GetState() == GMOD_CHANNEL_STOPPED or netFunc and !IsValid( srcEnt ) and ent:GetRemoveOnNoSource() then
             if IsValid( snd ) then snd:Stop() end
-            table_remove( NPCVC_SoundEmitters, index )
+            table_remove( NPCVC.SoundEmitters, index )
             continue
         end
         
@@ -235,6 +241,11 @@ local function UpdateSounds()
         if IsValid( srcEnt ) then
             lastPos = srcEnt:GetPos()
             sndData.LastPlayPos = lastPos
+        end
+
+        if playTime and realTime >= sndData.PlayTime then
+            snd:Play()
+            sndData.PlayTime = false
         end
 
         if enabled then
@@ -266,7 +277,9 @@ end
 local function DrawVoiceIcons()
     if !vcEnabled:GetBool() or !vcShowIcon:GetBool() then return end
 
-    for _, sndData in ipairs( NPCVC_SoundEmitters ) do
+    for _, sndData in pairs( NPCVC.VoicePopups ) do
+        if sndData.PlayTime or !IsValid( sndData.Sound ) then continue end
+
         local ang = EyeAngles()
         ang:RotateAroundAxis( ang:Up(), -90 )
         ang:RotateAroundAxis( ang:Forward(), 90 )
@@ -308,7 +321,17 @@ local function DrawVoiceChat()
 
     local canDrawSomething = false
     table_Empty( drawPopupIndexes )
-    for index, vcData in SortedPairsByMemberValue( NPCVC_VoicePopups, "FirstDisplayTime" ) do
+    for index, vcData in SortedPairsByMemberValue( NPCVC.VoicePopups, "FirstDisplayTime" ) do
+        local playTime = vcData.PlayTime
+        if playTime then
+            if realTime >= playTime then
+                playTime = false
+                vcData.PlayTime = playTime
+            else
+                continue
+            end
+        end
+
         local ent = vcData.Entity
         local lastPos = vcData.LastPlayPos
         if IsValid( ent ) then 
@@ -340,7 +363,7 @@ local function DrawVoiceChat()
             drawAlpha = Lerp( 0.5, vcData.AlphaRatio, drawAlpha )
         end
         if !IsValid( snd ) and drawAlpha == 0 then
-            NPCVC_VoicePopups[ index ] = nil
+            NPCVC.VoicePopups[ index ] = nil
             continue
         end
 
@@ -390,12 +413,6 @@ local function DrawVoiceChat()
 end
 
 local function OnCreateClientsideRagdoll( owner, ragdoll )
-    local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
-    if IsValid( sndEmitter ) and sndEmitter.SetSoundSource then 
-        sndEmitter:SetSoundSource( ragdoll ) 
-        return
-    end
-
     SimpleTimer( 0.1, function()
         if !IsValid( owner ) or !IsValid( ragdoll ) then return end
         sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
@@ -410,8 +427,8 @@ hook.Add( "CreateClientsideRagdoll", "NPCSqueakers_OnCreateClientsideRagdoll", O
 
 ------------------------------------------------------------------------------------------------------------
 
-NPCVC_ClientSettings    = NPCVC_ClientSettings or {}
-NPCVC_ServerSettings    = NPCVC_ServerSettings or {}
+NPCVC.ClientSettings    = NPCVC.ClientSettings or {}
+NPCVC.ServerSettings    = NPCVC.ServerSettings or {}
 
 local function OpenClassSpecificVPs( ply )
     if !ply:IsSuperAdmin() then
@@ -475,7 +492,7 @@ local function OpenClassSpecificVPs( ply )
         vpSelection:SetValue( "None" )
 
         vpSelection:AddChoice( "None", "" )
-        for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
+        for vp, prefix in SortedPairsByValue( NPCVC.VoiceProfiles ) do
             vpSelection:AddChoice( prefix .. vp, vp )
         end
 
@@ -531,7 +548,7 @@ local function OpenClassSpecificVPs( ply )
         npcImg:SetSize( 100, 100 )
         npcImg:Dock( TOP )
         
-        local iconMat = NPCVC_CachedMaterials[ class ]
+        local iconMat = NPCVC.CachedMaterials[ class ]
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "entities/" .. class .. ".jpg" ) end
@@ -540,7 +557,7 @@ local function OpenClassSpecificVPs( ply )
         if iconMat != false and !iconMat:IsError() then 
             npcImg:SetMaterial( iconMat )
         end
-        NPCVC_CachedMaterials[ class ] = ( iconMat or false ) 
+        NPCVC.CachedMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -681,7 +698,7 @@ local function OpenNPCBlacklisting( ply )
         npcImg:SetSize( 100, 100 )
         npcImg:Dock( TOP )
 
-        local iconMat = NPCVC_CachedMaterials[ class ]
+        local iconMat = NPCVC.CachedMaterials[ class ]
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "entities/" .. class .. ".jpg" ) end
@@ -690,7 +707,7 @@ local function OpenNPCBlacklisting( ply )
         if iconMat != false and !iconMat:IsError() then 
             npcImg:SetMaterial( iconMat )
         end
-        NPCVC_CachedMaterials[ class ] = ( iconMat or false ) 
+        NPCVC.CachedMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -878,7 +895,7 @@ local function OpenNPCWhitelisting( ply )
         npcImg:SetSize( 100, 100 )
         npcImg:Dock( TOP )
 
-        local iconMat = NPCVC_CachedMaterials[ class ]
+        local iconMat = NPCVC.CachedMaterials[ class ]
         if !iconMat then
             iconMat = Material( "entities/" .. class .. ".png" )
             if iconMat:IsError() then iconMat = Material( "entities/" .. class .. ".jpg" ) end
@@ -887,7 +904,7 @@ local function OpenNPCWhitelisting( ply )
         if iconMat != false and !iconMat:IsError() then 
             npcImg:SetMaterial( iconMat )
         end
-        NPCVC_CachedMaterials[ class ] = ( iconMat or false ) 
+        NPCVC.CachedMaterials[ class ] = ( iconMat or false ) 
 
         local npcName = vgui_Create( "DLabel", npcPanel )
         local prettyName = ( npcList[ class ] and npcList[ class ].Name )
@@ -1081,15 +1098,15 @@ concommand.Add( "cl_npcvoicechat_panel_npcnicknames", OpenNPCNicknames )
 ------------------------------------------------------------------------------------------------------------
 
 local function ResetClientSettings( ply )
-    for _, cvar in pairs( NPCVC_ClientSettings ) do cvar:SetString( cvar:GetDefault() ) end
+    for _, cvar in pairs( NPCVC.ClientSettings ) do cvar:SetString( cvar:GetDefault() ) end
 end
 
 local function ResetServerSettings( ply )
     if !ply:IsSuperAdmin() then return end
 
     net.Start( "npcsqueakers_resetsettings" )
-        net.WriteUInt( table.Count( NPCVC_ServerSettings ), 8 )
-        for cvarName, _ in pairs( NPCVC_ServerSettings ) do
+        net.WriteUInt( table.Count( NPCVC.ServerSettings ), 8 )
+        for cvarName, _ in pairs( NPCVC.ServerSettings ) do
             net.WriteString( cvarName )
         end
     net.SendToServer()
@@ -1124,7 +1141,7 @@ local function PopulateToolMenu()
 
         comboBox:AddChoice( "None", "" )
         local curVoicePfp, curValue = GetConVar( cvarName ):GetString()
-        for vp, prefix in SortedPairsByValue( NPCVC_VoiceProfiles ) do
+        for vp, prefix in SortedPairsByValue( NPCVC.VoiceProfiles ) do
             local prettyName = prefix .. vp
             comboBox:AddChoice( prettyName, vp )
             if curVoicePfp == vp then curValue = prettyName end
@@ -1150,9 +1167,9 @@ local function PopulateToolMenu()
 
         local cvar = GetConVar( convar )
         if client then
-            NPCVC_ClientSettings[ convar ] = cvar
+            NPCVC.ClientSettings[ convar ] = cvar
         else
-            NPCVC_ServerSettings[ convar ] = cvar
+            NPCVC.ServerSettings[ convar ] = cvar
         end
 
         return setting
@@ -1173,7 +1190,7 @@ local function PopulateToolMenu()
         } )
 
         local clVoicePfps = GetComboBoxVoiceProfiles( panel, false, "cl_npcvoicechat_spawnvoiceprofile" )
-        NPCVC_ClientSettings[ #NPCVC_ClientSettings + 1 ] = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" )
+        NPCVC.ClientSettings[ #NPCVC.ClientSettings + 1 ] = GetConVar( "cl_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( true, panel, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside\nConVar: cl_npcvoicechat_spawnvoiceprofile" )
 
         AddSettingsPanel( panel, true, "CheckBox", "Global Voice Chat", "cl_npcvoicechat_globalvoicechat", "If NPC's voice chat can be heard globally and not in 3D" )
@@ -1195,13 +1212,13 @@ local function PopulateToolMenu()
         panel:AddItem( popupColor )
 
         popupColor:SetConVarR( "cl_npcvoicechat_popupcolor_r" )
-        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_r" ] = GetConVar( "cl_npcvoicechat_popupcolor_r" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_r" ] = GetConVar( "cl_npcvoicechat_popupcolor_r" )
 
         popupColor:SetConVarG( "cl_npcvoicechat_popupcolor_g" )
-        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_g" ] = GetConVar( "cl_npcvoicechat_popupcolor_g" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_g" ] = GetConVar( "cl_npcvoicechat_popupcolor_g" )
 
         popupColor:SetConVarB( "cl_npcvoicechat_popupcolor_b" )
-        NPCVC_ClientSettings[ "cl_npcvoicechat_popupcolor_b" ] = GetConVar( "cl_npcvoicechat_popupcolor_b" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_b" ] = GetConVar( "cl_npcvoicechat_popupcolor_b" )
 
         ColoredControlHelp( true, panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
 
@@ -1268,7 +1285,7 @@ local function PopulateToolMenu()
         end
 
         local svVoicePfps = GetComboBoxVoiceProfiles( panel, false, "sv_npcvoicechat_spawnvoiceprofile" )
-        NPCVC_ServerSettings[ "sv_npcvoicechat_spawnvoiceprofile" ] = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" )
+        NPCVC.ServerSettings[ "sv_npcvoicechat_spawnvoiceprofile" ] = GetConVar( "sv_npcvoicechat_spawnvoiceprofile" )
         ColoredControlHelp( false, panel, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one\nConVar: sv_npcvoicechat_spawnvoiceprofile" )
 
         AddSettingsPanel( panel, false, "NumSlider", "Voice Profile Spawn Chance", "sv_npcvoicechat_randomvoiceprofilechance", "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn", {

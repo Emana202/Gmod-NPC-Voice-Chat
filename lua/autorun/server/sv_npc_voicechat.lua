@@ -1,6 +1,7 @@
 local net = net
 local ipairs = ipairs
 local pairs = pairs
+local RandomPairs = RandomPairs
 local IsValid = IsValid
 local SimpleTimer = timer.Simple
 local random = math.random
@@ -180,18 +181,20 @@ util.AddNetworkString( "npcsqueakers_writedata" )
 util.AddNetworkString( "npcsqueakers_requestdata" )
 util.AddNetworkString( "npcsqueakers_returndata" )
 
-NPCVC_NickNames         = NPCVC_NickNames or {}
-NPCVC_VoiceLines        = NPCVC_VoiceLines or {}
-NPCVC_ProfilePictures   = NPCVC_ProfilePictures or {}
-NPCVC_UserPFPs          = NPCVC_UserPFPs or {}
-NPCVC_VoiceProfiles     = NPCVC_VoiceProfiles or {}
-NPCVC_NPCVoiceProfiles  = NPCVC_NPCVoiceProfiles or {}
-NPCVC_NPCBlacklist      = NPCVC_NPCBlacklist or {}
-NPCVC_NPCWhitelist      = NPCVC_NPCWhitelist or {}
-NPCVC_IsInitialized     = NPCVC_IsInitialized or false
-NPCVC_TalkingNPCs       = NPCVC_TalkingNPCs or {}
-NPCVC_MapTransitionNPCs = NPCVC_MapTransitionNPCs or nil
-NPCVC_CachedNPCPfps     = {}
+NPCVC                   = NPCVC or {}
+NPCVC.NickNames         = NPCVC.NickNames or {}
+NPCVC.VoiceLines        = NPCVC.VoiceLines or {}
+NPCVC.ProfilePictures   = NPCVC.ProfilePictures or {}
+NPCVC.UserPFPs          = NPCVC.UserPFPs or {}
+NPCVC.VoiceProfiles     = NPCVC.VoiceProfiles or {}
+NPCVC.NPCVoiceProfiles  = NPCVC.NPCVoiceProfiles or {}
+NPCVC.NPCBlacklist      = NPCVC.NPCBlacklist or {}
+NPCVC.NPCWhitelist      = NPCVC.NPCWhitelist or {}
+NPCVC.IsInitialized     = NPCVC.IsInitialized or false
+NPCVC.TalkingNPCs       = NPCVC.TalkingNPCs or {}
+NPCVC.MapTransitionNPCs = NPCVC.MapTransitionNPCs or nil
+NPCVC.CachedNPCPfps     = {}
+NPCVC.LastUsedLines     = NPCVC.LastUsedLines or {}
 
 file.CreateDir( "npcvoicechat" )
 
@@ -254,11 +257,11 @@ local function AddVoiceProfile( path )
             local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME" )
             if !voicelines or #voicelines == 0 then continue end
 
-            NPCVC_VoiceProfiles[ voicePfp ] = ( NPCVC_VoiceProfiles[ voicePfp ] or {} )
-            NPCVC_VoiceProfiles[ voicePfp ][ voiceType ] = {}
+            NPCVC.VoiceProfiles[ voicePfp ] = ( NPCVC.VoiceProfiles[ voicePfp ] or {} )
+            NPCVC.VoiceProfiles[ voicePfp ][ voiceType ] = {}
 
             for _, voiceline in ipairs( voicelines ) do
-                table_insert( NPCVC_VoiceProfiles[ voicePfp ][ voiceType ], voiceTypePath .. "/" .. voiceline )
+                table_insert( NPCVC.VoiceProfiles[ voicePfp ][ voiceType ], voiceTypePath .. "/" .. voiceline )
             end
         end
     end
@@ -269,60 +272,60 @@ local function UpdateData( ply )
 
     local names = file_Read( "npcvoicechat/names.json", "DATA" )
     if !names then
-        NPCVC_NickNames = defaultNames
+        NPCVC.NickNames = defaultNames
         file_Write( "npcvoicechat/names.json", TableToJSON( defaultNames ) )
     else
-        NPCVC_NickNames = JSONToTable( names )
+        NPCVC.NickNames = JSONToTable( names )
     end
 
     local npcVPs = file_Read( "npcvoicechat/classvps.json", "DATA" )
     if !npcVPs then
-        table_Empty( NPCVC_NPCVoiceProfiles )
-        file_Write( "npcvoicechat/classvps.json", TableToJSON( NPCVC_NPCVoiceProfiles ) )
+        table_Empty( NPCVC.NPCVoiceProfiles )
+        file_Write( "npcvoicechat/classvps.json", TableToJSON( NPCVC.NPCVoiceProfiles ) )
     else
-        NPCVC_NPCVoiceProfiles = JSONToTable( npcVPs )
+        NPCVC.NPCVoiceProfiles = JSONToTable( npcVPs )
     end
 
     local npcBlacklist = file_Read( "npcvoicechat/npcblacklist.json", "DATA" )
     if !npcBlacklist then
-        table_Empty( NPCVC_NPCBlacklist )
-        file_Write( "npcvoicechat/npcblacklist.json", TableToJSON( NPCVC_NPCBlacklist ) )
+        table_Empty( NPCVC.NPCBlacklist )
+        file_Write( "npcvoicechat/npcblacklist.json", TableToJSON( NPCVC.NPCBlacklist ) )
     else
-        NPCVC_NPCBlacklist = JSONToTable( npcBlacklist )
+        NPCVC.NPCBlacklist = JSONToTable( npcBlacklist )
     end
 
     local npcWhitelist = file_Read( "npcvoicechat/npcwhitelist.json", "DATA" )
     if !npcWhitelist then
-        table_Empty( NPCVC_NPCWhitelist )
-        file_Write( "npcvoicechat/npcwhitelist.json", TableToJSON( NPCVC_NPCWhitelist ) )
+        table_Empty( NPCVC.NPCWhitelist )
+        file_Write( "npcvoicechat/npcwhitelist.json", TableToJSON( NPCVC.NPCWhitelist ) )
     else
-        NPCVC_NPCWhitelist = JSONToTable( npcWhitelist )
+        NPCVC.NPCWhitelist = JSONToTable( npcWhitelist )
     end
 
-    table_Empty( NPCVC_VoiceLines )
+    table_Empty( NPCVC.VoiceLines )
     for voiceType, voiceDir in pairs( vcVoiceTypeDirs ) do
         local sndDir = voiceDir:GetString() .. "/"
         local lineTbl = {}
         local snds = file_Find( "sound/" .. sndDir .. "*", "GAME" )
         for _, snd in ipairs( snds ) do lineTbl[ #lineTbl + 1 ] = sndDir .. snd end
-        NPCVC_VoiceLines[ voiceType ] = lineTbl
+        NPCVC.VoiceLines[ voiceType ] = lineTbl
     end
 
-    table_Empty( NPCVC_ProfilePictures )
+    table_Empty( NPCVC.ProfilePictures )
     local pfpPics = file_Find( "materials/npcvcdata/profilepics/*", "GAME" )
     for _, pfpPic in ipairs( pfpPics ) do
-        NPCVC_ProfilePictures[ #NPCVC_ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
+        NPCVC.ProfilePictures[ #NPCVC.ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
     end
 
-    table_Empty( NPCVC_UserPFPs )
+    table_Empty( NPCVC.UserPFPs )
     pfpPics = file_Find( "materials/npcvcdata/custompfps/*", "GAME" )
     if pfpPics then
         for _, pfpPic in ipairs( pfpPics ) do
-            NPCVC_UserPFPs[ #NPCVC_UserPFPs + 1 ] = "npcvcdata/custompfps/" .. pfpPic
+            NPCVC.UserPFPs[ #NPCVC.UserPFPs + 1 ] = "npcvcdata/custompfps/" .. pfpPic
         end
     end
 
-    table_Empty( NPCVC_VoiceProfiles )
+    table_Empty( NPCVC.VoiceProfiles )
     AddVoiceProfile( "npcvoicechat/voiceprofiles" )
     AddVoiceProfile( "lambdaplayers/voiceprofiles" )
     AddVoiceProfile( "zetaplayer/custom_vo" )
@@ -331,9 +334,9 @@ local function UpdateData( ply )
     net.Broadcast()
 end
 
-if !NPCVC_IsInitialized then
+if !NPCVC.IsInitialized then
     UpdateData()
-    NPCVC_IsInitialized = true
+    NPCVC.IsInitialized = true
 end
 
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
@@ -380,10 +383,10 @@ end
 duplicator.RegisterEntityModifier( "NPC VoiceChat - NPC's Voice Data", SetNPCVoiceChatData )
 
 local nextbotMETA = FindMetaTable( "NextBot" )
-NPCVC_OldFunc_BecomeRagdoll = NPCVC_OldFunc_BecomeRagdoll or nextbotMETA.BecomeRagdoll
+NPCVC.OldFunc_BecomeRagdoll = NPCVC.OldFunc_BecomeRagdoll or nextbotMETA.BecomeRagdoll
 
 function nextbotMETA:BecomeRagdoll( dmginfo )
-    local ragdoll = NPCVC_OldFunc_BecomeRagdoll( self, dmginfo )
+    local ragdoll = NPCVC.OldFunc_BecomeRagdoll( self, dmginfo )
     if self.IsDrGNextbot and IsValid( ragdoll ) then
         local sndEmitter = self:GetNW2Entity( "npcsqueakers_sndemitter" )
         if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
@@ -394,21 +397,38 @@ end
 local function GetVoiceLine( ent, voiceType )
     local voiceTbl
 
-    local voicePfp = NPCVC_VoiceProfiles[ ent.NPCVC_VoiceProfile ]
+    local voicePfp = NPCVC.VoiceProfiles[ ent.NPCVC_VoiceProfile ]
     if voicePfp then
         voiceTbl = voicePfp[ voiceType ]
     else
-        local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC_VoiceLines ) 
+        local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC.VoiceLines ) 
         voiceTbl = voicelineTbl[ voiceType ]
     end
     if ( !voiceTbl or #voiceTbl == 0 ) and ( !voicePfp or !vcVoiceProfileFallback:GetBool() ) then return end
 
-    randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + RealTime() ) -- Trust me, this will work :)
+    local realTime = RealTime()
+    randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
+
+    for _, voiceLine in RandomPairs( voiceTbl ) do
+        local useTime = NPCVC.LastUsedLines[ voiceLine ]
+        if useTime then
+            if realTime > useTime then
+                NPCVC.LastUsedLines[ voiceLine ] = nil
+            else
+                continue
+            end
+        else
+            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 1200 )
+        end
+
+        return voiceLine
+    end
+
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
-local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
-    if !npc.NPCVC_Initialized or NPCVC_NPCBlacklist[ npc:GetClass() ] then return end
+function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
+    if !npc.NPCVC_Initialized or NPCVC.NPCBlacklist[ npc:GetClass() ] then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
@@ -421,15 +441,17 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     if !ignoreGagTypes[ voiceType ] and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
 
     local oldEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
-    if !NPCVC_TalkingNPCs[ oldEmitter ] and ( voiceType != "death" or !vcLimitAffectsDeath:GetBool() ) then
+    if !NPCVC.TalkingNPCs[ oldEmitter ] and ( voiceType != "death" or !vcLimitAffectsDeath:GetBool() ) then
         local speakLimit = vcSpeakLimit:GetInt()
-        if speakLimit > 0 and table_Count( NPCVC_TalkingNPCs ) >= speakLimit then return end
+        if speakLimit > 0 and table_Count( NPCVC.TalkingNPCs ) >= speakLimit then return end
     end
 
     local sndName = GetVoiceLine( npc, voiceType )
     if !sndName then return end
 
     local sndEmitter = ents_Create( "npc_vc_sndemitter" )
+    if !IsValid( sndEmitter ) then return end
+
     sndEmitter:SetPos( npc:GetPos() )
     sndEmitter:SetOwner( npc )
     sndEmitter.DontRemoveEntity = dontDeleteOnRemove
@@ -446,12 +468,11 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
         ProfilePicture = npc.NPCVC_ProfilePicture
     }
 
-    local playDelay = ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 )
-    if vcSlightDelay:GetBool() then playDelay = ( random( ( playDelay * 10 ), 7 ) / 10 ) end
-    SimpleTimer( playDelay, function()
+    SimpleTimer( ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 ), function()
         net.Start( "npcsqueakers_playsound" )
             net.WriteString( sndName )
             net.WriteTable( vcData )
+            net.WriteFloat( !vcSlightDelay:GetBool() and 0 or Rand( 0.0, 0.75 ) )
         net.Broadcast()
     end )
     if IsValid( oldEmitter ) then oldEmitter:Remove() end
@@ -460,7 +481,7 @@ local function PlaySoundFile( npc, voiceType, dontDeleteOnRemove, isInput )
     npc:SetNW2Entity( "npcsqueakers_sndemitter", sndEmitter )
 end
 
-local function StopSpeaking( npc, voiceType )
+function NPCVC:StopCurrentSpeech( npc, voiceType )
     if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     if !IsValid( sndEmitter ) then return end
@@ -468,14 +489,14 @@ local function StopSpeaking( npc, voiceType )
     sndEmitter.SpeechPlayTime = 0
 end
 
-local function IsSpeaking( npc, voiceType )
+function NPCVC:IsCurrentlySpeaking( npc, voiceType )
     if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return false end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     return ( IsValid( sndEmitter ) and RealTime() <= sndEmitter.SpeechPlayTime )
 end
 
 local function GetAvailableNickname()
-    local nameListTbl = ( ( LambdaPlayerNames and vcUseLambdaNicknames:GetBool() ) and LambdaPlayerNames or NPCVC_NickNames )
+    local nameListTbl = ( ( LambdaPlayerNames and vcUseLambdaNicknames:GetBool() ) and LambdaPlayerNames or NPCVC.NickNames )
 
     local nameListCopy = table_Copy( nameListTbl )
     for _, v in ipairs( ents_GetAll() ) do
@@ -487,7 +508,7 @@ local function GetAvailableNickname()
     return ( rndName and rndName or nameListTbl[ random( #nameListTbl ) ] )
 end
 
-local function GetNPCEnemy( npc )
+function NPCVC:GetEnemyOfNPC( npc )
     if npc:GetClass() == "reckless_kleiner" then 
         local vehicle = npc:GetParent()
         return ( IsValid( vehicle ) and vehicle.enemy )
@@ -505,7 +526,7 @@ local tf2BotsDispTranslation = {
     [ "neutral" ]   = D_NU,
     [ "foe" ]       = D_HT
 }
-local function GetNPCDisposition( npc, target )
+function NPCVC:GetDispositionOfNPC( npc, target )
     if npc.MNG_TF2Bot then return ( tf2BotsDispTranslation[ npc:FriendOrFoe( target ) ] or D_NU ) end
 
     local dispFunc = npc.Disposition
@@ -517,8 +538,8 @@ local function GetNPCProfilePicture( npc )
         if vcUseLambdaPfpPics:GetBool() and #Lambdaprofilepictures != 0 then
             return Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
         else
-            local pfpPics = NPCVC_ProfilePictures
-            local userPfps = NPCVC_UserPFPs
+            local pfpPics = NPCVC.ProfilePictures
+            local userPfps = NPCVC.UserPFPs
             if #userPfps != 0 then
                 if vcUserPfpsOnly:GetBool() then
                     pfpPics = userPfps
@@ -534,10 +555,10 @@ local function GetNPCProfilePicture( npc )
     local npcModel = npc:GetModel()
 
     local cacheType = npcModel
-    local profilePic = NPCVC_CachedNPCPfps[ cacheType ]
+    local profilePic = NPCVC.CachedNPCPfps[ cacheType ]
     if !profilePic then
         cacheType = npcClass
-        profilePic = NPCVC_CachedNPCPfps[ cacheType ]
+        profilePic = NPCVC.CachedNPCPfps[ cacheType ]
     end
 
     if profilePic == nil or profilePic != false then
@@ -585,9 +606,9 @@ local function GetNPCProfilePicture( npc )
 
         if !iconMat:IsError() then
             profilePic = iconName
-            NPCVC_CachedNPCPfps[ cacheType ] = iconName
+            NPCVC.CachedNPCPfps[ cacheType ] = iconName
         elseif profilePic == nil then
-            NPCVC_CachedNPCPfps[ cacheType ] = false
+            NPCVC.CachedNPCPfps[ cacheType ] = false
         end
     end
 
@@ -606,7 +627,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     local assistLines = vcAllowLines_Assist:GetBool()
 
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
-        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or random( 1, 100 ) > npc.NPCVC_SpeechChance or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 3 ) != 1 and IsSpeaking( npc ) ) then continue end
+        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or random( 1, 100 ) > npc.NPCVC_SpeechChance or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 3 ) != 1 and NPCVC:IsCurrentlySpeaking( npc ) ) then continue end
 
         local locAttacker = attacker
         if npc:GetClass() == "reckless_kleiner" and attacker == npc:GetParent() then
@@ -614,36 +635,33 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if locAttacker == npc then
-            if killLines and npc.NPCVC_LastValidEnemy == ent and !IsSpeaking( npc, "laugh" ) and !IsSpeaking( npc, "kill" ) then
-                PlaySoundFile( npc, ( random( 1, 6 ) == 1 and "laugh" or "kill" ) )
+            if killLines and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) then
+                NPCVC:PlayVoiceLine( npc, ( random( 1, 5 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
-        elseif attackPos and random( 1, 3 ) != 1 then
-            if ( locAttacker == ent or locAttacker:IsWorld() ) and !IsSpeaking( npc, "laugh" ) then
-                PlaySoundFile( npc, "laugh" )
+        elseif attackPos and random( 1, 2 ) != 1 then
+            if ( locAttacker == ent or locAttacker:IsWorld() or NPCVC:GetDispositionOfNPC( locAttacker, ent ) == D_LI ) and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then
+                NPCVC:PlayVoiceLine( npc, "laugh" )
                 continue
             end
 
-            local npcPos = npc:GetPos()
-            if GetNPCDisposition( npc, locAttacker ) != D_HT then 
-                if assistLines and attackPos:DistToSqr( npcPos ) <= 562500 and !IsSpeaking( npc, "assist" ) then
-                    local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
-                    if !isEnemy and npc:IsNPC() then
-                        for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
-                            isEnemy = ( knownEne == ent )
-                            if isEnemy then break end
-                        end
+            if assistLines and !NPCVC:IsCurrentlySpeaking( npc, "assist" ) and NPCVC:GetDispositionOfNPC( npc, locAttacker ) != D_HT and attackPos:DistToSqr( npc:GetPos() ) <= 1000000 then
+                local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
+                if !isEnemy and npc:IsNPC() then
+                    for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
+                        isEnemy = ( knownEne == ent )
+                        if isEnemy then break end
                     end
-                    if isEnemy then
-                        PlaySoundFile( npc, "assist" )
-                        continue
-                    end
+                end
+                if isEnemy then
+                    NPCVC:PlayVoiceLine( npc, "assist" )
+                    continue
                 end
             end
 
-            local isFriend = ( GetNPCDisposition( npc, ent ) == D_LI )
-            if witnessLines and ( isFriend or random( 1, 3 ) == 1 ) and entPos:DistToSqr( npcPos ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
-                PlaySoundFile( npc, ( ( isFriend and random( 1, 3 ) == 1 ) and "panic" or "witness" ) )
+            local entDisp = NPCVC:GetDispositionOfNPC( npc, ent )
+            if entDisp >= 3 and entPos:DistToSqr( npc:GetPos() ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
+                NPCVC:PlayVoiceLine( npc, ( random( 1, 3 ) == 1 and "panic" or "witness" ) )
                 continue
             end
         end
@@ -651,11 +669,11 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
 end
 
 local function OnEntityCreated( npc )
-    local mapSavedData = NPCVC_MapTransitionNPCs
+    local mapSavedData = NPCVC.MapTransitionNPCs
     if !mapSavedData then 
         local mapSavedNPCs = file_Read( "npcvoicechat/mapsavednpcs.json", "DATA" )
         mapSavedData = ( mapSavedNPCs and JSONToTable( mapSavedNPCs ) or {} )
-        NPCVC_MapTransitionNPCs = mapSavedData
+        NPCVC.MapTransitionNPCs = mapSavedData
     end
     if !vcSaveNPCDataOnMapChange:GetBool() then
         mapSavedData = nil
@@ -663,16 +681,14 @@ local function OnEntityCreated( npc )
 
     SimpleTimer( 0, function()
         if !IsValid( npc ) then return end
-
-        if npc.NPCVC_Initialized then 
-            npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 3, 10 ) )
-            npc.NPCVC_NextDangerSoundTime = 0
-            npc.NPCVC_LastSeenEnemyTime = 0
-            return 
-        end
+        
+        npc.NPCVC_LastSeenEnemyTime = 0
+        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 15 ) )
+        npc.NPCVC_NextDangerSoundTime = 0
+        if npc.NPCVC_Initialized then return end
 
         local npcClass = npc:GetClass()
-        local whitelistVoice = NPCVC_NPCWhitelist[ npcClass ]
+        local whitelistVoice = NPCVC.NPCWhitelist[ npcClass ]
         if !whitelistVoice then
             if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
@@ -684,9 +700,6 @@ local function OnEntityCreated( npc )
         npc.NPCVC_IsLowHealth = false
         npc.NPCVC_InPanicState = false
         npc.NPCVC_LastState = -1
-        npc.NPCVC_LastSeenEnemyTime = 0
-        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 10 ) )
-        npc.NPCVC_NextDangerSoundTime = 0
         npc.NPCVC_LastVoiceLine = ""
         npc.NPCVC_IdleVoiceType = ( whitelistVoice != true and whitelistVoice or "idle" )
 
@@ -719,13 +732,13 @@ local function OnEntityCreated( npc )
             local profilePic = GetNPCProfilePicture( npc )
             npc.NPCVC_ProfilePicture = profilePic
 
-            local voicePfp = NPCVC_NPCVoiceProfiles[ npcClass ]
+            local voicePfp = NPCVC.NPCVoiceProfiles[ npcClass ]
             if !voicePfp then
                 local cvarVoice = vcVoiceProfile:GetString()
-                voicePfp = NPCVC_VoiceProfiles[ cvarVoice ]
+                voicePfp = NPCVC.VoiceProfiles[ cvarVoice ]
                 if !voicePfp then 
                     if random( 1, 100 ) <= vcVoiceProfileChance:GetInt() then
-                        local voicePfps = table_GetKeys( NPCVC_VoiceProfiles ) 
+                        local voicePfps = table_GetKeys( NPCVC.VoiceProfiles ) 
                         voicePfp = voicePfps[ random( #voicePfps ) ]
                     end
                 else
@@ -752,7 +765,7 @@ local function OnEntityCreated( npc )
 
                     local saveData = mapSavedData[ npcClass ]
                     if !saveData then
-                        NPCVC_MapTransitionNPCs[ npcClass ] = npc.NPCVC_StoredData
+                        NPCVC.MapTransitionNPCs[ npcClass ] = npc.NPCVC_StoredData
                     else
                         SetNPCVoiceChatData( nil, npc, saveData )
                     end
@@ -765,12 +778,12 @@ local function OnEntityCreated( npc )
 
             function npc:PlaySoundSystem( sdSet, customSd, sdType )
                 if sdSet == "OnDangerSight" or sdSet == "OnGrenadeSight" then
-                    if vcAllowLines_SpotDanger:GetBool() and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) then
-                        PlaySoundFile( npc, "witness" or "panic" )
+                    if vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
+                        NPCVC:PlayVoiceLine( npc, "witness" or "panic" )
                     end
-                elseif random( 1, 100 ) <= npc.NPCVC_SpeechChance and !IsSpeaking( npc ) then
+                elseif random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
                     if sdSet == "MedicReceiveHeal" and vcAllowLines_Assist:GetBool() then
-                        PlaySoundFile( npc, "assist" )
+                        NPCVC:PlayVoiceLine( npc, "assist" )
                     end
                 end
 
@@ -798,7 +811,7 @@ local function OnNPCKilled( npc, attacker, inflictor, isInput )
     if !npc.NPCVC_Initialized then return end
 
     if vcAllowLines_Death:GetBool() then
-        PlaySoundFile( npc, "death", true, isInput )
+        NPCVC:PlayVoiceLine( npc, "death", true, isInput )
     end
 
     CheckNearbyNPCOnDeath( npc, attacker )
@@ -840,11 +853,11 @@ local function OnServerThink()
                 local lastState = npc.NPCVC_LastState
                 if curState != lastState then
                     if lastState == NPC_STATE_DEAD and npc:IsPlayerHolding() and vcAllowLines_Assist:GetBool() then
-                        PlaySoundFile( npc, "assist" )
+                        NPCVC:PlayVoiceLine( npc, "assist" )
                     elseif curState == NPC_STATE_DEAD and vcAllowLines_SpotDanger:GetBool() then
-                        PlaySoundFile( npc, "panic" )
+                        NPCVC:PlayVoiceLine( npc, "panic" )
                     elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() then
-                        PlaySoundFile( npc, "taunt" )
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
                     end
                 end
                 npc.NPCVC_LastState = curState
@@ -852,7 +865,7 @@ local function OnServerThink()
                 local curEnemy = npc:GetEnemy()
                 local lastEnemy = npc.NPCVC_LastEnemy
                 if curEnemy != lastEnemy and IsValid( curEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
-                    PlaySoundFile( npc, "taunt" )
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
                 end
                 npc.NPCVC_LastEnemy = curEnemy
             elseif !npc.NPCVC_InPanicState then
@@ -861,21 +874,20 @@ local function OnServerThink()
                 if vcAllowLines_PanicCond:GetBool() then
                     SimpleTimer( Rand( 0.8, 1.25 ), function()
                         if !IsValid( npc ) then return end
-                        PlaySoundFile( npc, "panic" )
+                        NPCVC:PlayVoiceLine( npc, "panic" )
                     end )
 
                     SimpleTimer( Rand( 2, 3.5 ), function()
                         if !IsValid( npc ) then return end
-                        PlaySoundFile( npc, "death" )
+                        NPCVC:PlayVoiceLine( npc, "death" )
                     end )
                 end
             end
         elseif npcClass == "npc_rollermine" and IsValid( npc:GetInternalVariable( "m_hVehicleStuckTo" ) ) and vcAllowLines_CombatIdle:GetBool() then
             if curTime >= npc.NPCVC_NextIdleSpeak then 
-                if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !IsSpeaking( npc ) then
-                    PlaySoundFile( npc, "taunt" )
+                if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
                 end
-                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
             end
         elseif npcClass == "npc_antlion_grub" then
             local curState = npc:GetInternalVariable( "m_State" )
@@ -889,14 +901,10 @@ local function OnServerThink()
                 local curState = npc:GetInternalVariable( "m_State" )
                 if random( 1, 100 ) <= npc.NPCVC_SpeechChance then
                     if curState == 1 and curState != npc.NPCVC_LastState then
-                        PlaySoundFile( npc, "taunt" )
-                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
-                        PlaySoundFile( npc, ( curState == 1 and "taunt" or "idle" ) )
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
+                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
+                        NPCVC:PlayVoiceLine( npc, ( curState == 1 and "taunt" or "idle" ) )
                     end
-                end
-
-                if curTime >= npc.NPCVC_NextIdleSpeak then
-                    npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
                 end
 
                 npc.NPCVC_LastState = curState
@@ -909,22 +917,18 @@ local function OnServerThink()
 
                 if lookTarget != lastTarget and IsValid( lookTarget ) or isAngry and isAngry != npc.NPCVC_LastState then 
                     if isAngry and vcAllowLines_CombatIdle:GetBool() then
-                        PlaySoundFile( npc, "taunt" )
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
                     elseif vcAllowLines_Idle:GetBool() then
-                        PlaySoundFile( npc, "idle" )
+                        NPCVC:PlayVoiceLine( npc, "idle" )
                     end
                 end
 
-                if npc:GetInternalVariable( "m_bActive" ) and IsValid( lookTarget ) and curTime >= npc.NPCVC_NextIdleSpeak and random( 1, 100 ) <= npc.NPCVC_SpeechChance and !IsSpeaking( npc ) then
+                if npc:GetInternalVariable( "m_bActive" ) and IsValid( lookTarget ) and curTime >= npc.NPCVC_NextIdleSpeak and random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
                     if IsValid( lookTarget ) and isAngry and vcAllowLines_CombatIdle:GetBool() then
-                        PlaySoundFile( npc, "taunt" )
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
                     elseif vcAllowLines_Idle:GetBool() then
-                        PlaySoundFile( npc, "idle" )
+                        NPCVC:PlayVoiceLine( npc, "idle" )
                     end
-                end
-
-                if curTime >= npc.NPCVC_NextIdleSpeak then
-                    npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
                 end
 
                 npc.NPCVC_LastEnemy = lookTarget
@@ -932,11 +936,11 @@ local function OnServerThink()
             elseif npc.NPCVC_LastState != -1 then
                 npc.NPCVC_LastState = -1
                 if vcAllowLines_Death:GetBool() then
-                    PlaySoundFile( npc, "death" )
+                    NPCVC:PlayVoiceLine( npc, "death" )
                 end
             end
         else
-            local curEnemy = GetNPCEnemy( npc )
+            local curEnemy = NPCVC:GetEnemyOfNPC( npc )
             local rolledSpeech = ( random( 1, 100 ) <= npc.NPCVC_SpeechChance )
 
             if npc.LastPathingInfraction then
@@ -950,22 +954,22 @@ local function OnServerThink()
 
                 if rolledSpeech then
                     if lastSeenTime == 0 and isVisible and vcAllowLines_SpotEnemy:GetBool() then
-                        PlaySoundFile( npc, "taunt" )
-                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
+                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
                         if ( curTime - npc.NPCVC_LastSeenEnemyTime ) <= 5 and IsValid( curEnemy ) then
                             if vcAllowLines_CombatIdle:GetBool() then
-                                PlaySoundFile( npc, "taunt" )
+                                NPCVC:PlayVoiceLine( npc, "taunt" )
                             end
                         elseif vcAllowLines_Idle:GetBool() then
-                            PlaySoundFile( npc, "idle" )
+                            NPCVC:PlayVoiceLine( npc, "idle" )
                         end
                     end
                 end
             else
                 local lifeState = npc:GetInternalVariable( "m_lifeState" )
                 if lifeState != 0 and ( npcClass == "npc_combinegunship" or npcClass == "npc_helicopter" ) then
-                    if !IsSpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
-                        PlaySoundFile( npc, "death", true )
+                    if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
+                        NPCVC:PlayVoiceLine( npc, "death", true )
                     end
                 elseif lifeState == 0 then
                     local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
@@ -1001,8 +1005,8 @@ local function OnServerThink()
                     end
 
                     if isPurelyPanic then
-                        if !IsSpeaking( npc, "panic" ) then
-                            PlaySoundFile( npc, "panic" )
+                        if !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                            NPCVC:PlayVoiceLine( npc, "panic" )
                         end
 
                         if barnacled then
@@ -1026,12 +1030,12 @@ local function OnServerThink()
                         end               
                     else
                         if stopSpeech and npc.NPCVC_InPanicState then
-                            StopSpeaking( npc, "panic" )
+                            NPCVC:StopCurrentSpeech( npc, "panic" )
 
                             if IsValid( curEnemy ) and vcAllowLines_CombatIdle:GetBool() then
-                                PlaySoundFile( npc, "taunt" )
+                                NPCVC:PlayVoiceLine( npc, "taunt" )
                             elseif vcAllowLines_Idle:GetBool() then
-                                PlaySoundFile( npc, "witness" )
+                                NPCVC:PlayVoiceLine( npc, "witness" )
                             end
                         end
 
@@ -1046,7 +1050,7 @@ local function OnServerThink()
                         local combatLine = "taunt" 
                         
                         if IsValid( curEnemy ) then
-                            isPanicking = ( !npc:IsNextBot() and IsValid( curEnemy ) and curEnemy.LastPathingInfraction )
+                            isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
 
                             if curEnemy == lastEnemy and IsValid( lastEnemy ) and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
                                 combatLine = "idle"
@@ -1059,28 +1063,28 @@ local function OnServerThink()
                             end
                         end
 
-                        if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and npc:IsNPC() and !IsSpeaking( npc, "panic" ) and !IsSpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
-                            PlaySoundFile( npc, "panic" )
+                        if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and npc:IsNPC() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
+                            NPCVC:PlayVoiceLine( npc, "panic" )
                             npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
                         elseif npc:IsNPC() and !npc.IsVJBaseSNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
                             if rolledSpeech then
                                 if !isPanicking then
-                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or GetNPCDisposition( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
+                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
                                 end
 
                                 if curState != npc.NPCVC_LastState then
-                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
-                                        PlaySoundFile( npc, combatLine )
+                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                                        NPCVC:PlayVoiceLine( npc, combatLine )
                                     end
-                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
+                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
                                     if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
                                         if vcAllowLines_CombatIdle:GetBool() then
-                                            PlaySoundFile( npc, combatLine )
+                                            NPCVC:PlayVoiceLine( npc, combatLine )
                                         end
                                     elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT ) and vcAllowLines_Idle:GetBool() then
-                                        PlaySoundFile( npc, "idle" )
+                                        NPCVC:PlayVoiceLine( npc, "idle" )
                                     end
                                 end
                             end
@@ -1089,12 +1093,12 @@ local function OnServerThink()
                         else
                             if npc.IsDrGNextbot and npc:IsDown() then 
                                 if npc.NPCVC_LastState != 1 then
-                                    PlaySoundFile( npc, "death" )
+                                    NPCVC:PlayVoiceLine( npc, "death" )
                                     npc.NPCVC_LastState = 1
                                 end
                             elseif npc.NPCVC_LastState == 1 then
                                 npc.NPCVC_LastState = -1
-                                if rolledSpeech and IsValid( curEnemy ) then PlaySoundFile( npc, "taunt" ) end
+                                if rolledSpeech and IsValid( curEnemy ) then NPCVC:PlayVoiceLine( npc, "taunt" ) end
                             end
 
                             if rolledSpeech then
@@ -1103,16 +1107,16 @@ local function OnServerThink()
                                 end
 
                                 if curEnemy != lastEnemy then
-                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !IsSpeaking( npc, "taunt" ) and !IsSpeaking( npc, "panic" ) then
-                                        PlaySoundFile( npc, combatLine )
+                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                                        NPCVC:PlayVoiceLine( npc, combatLine )
                                     end
-                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !IsSpeaking( npc ) then
+                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
                                     if IsValid( curEnemy ) then
                                         if vcAllowLines_CombatIdle:GetBool() then
-                                            PlaySoundFile( npc, combatLine )
+                                            NPCVC:PlayVoiceLine( npc, combatLine )
                                         end
                                     elseif vcAllowLines_Idle:GetBool() then
-                                        PlaySoundFile( npc, npc.NPCVC_IdleVoiceType )
+                                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
                                     end
                                 end
                             end
@@ -1128,10 +1132,10 @@ local function OnServerThink()
                 npc.NPCVC_LastValidEnemy = curEnemy
                 if npc:Visible( curEnemy ) then npc.NPCVC_LastSeenEnemyTime = curTime end
             end
+        end
 
-            if curTime >= npc.NPCVC_NextIdleSpeak then
-                npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 3, 10 ) )
-            end
+        if curTime >= npc.NPCVC_NextIdleSpeak then
+            npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 0, 15 ) )
         end
     end
 end
@@ -1148,7 +1152,7 @@ local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
         end
     end
 
-    if random( 1, 4 ) == 1 and !IsSpeaking( ent, "panic" ) and IsValid( GetNPCEnemy( ent ) ) and dmginfo:GetDamage() >= ( ent:GetMaxHealth() / random( 2, 4 ) ) then
+    if random( 1, 4 ) == 1 and !NPCVC:IsCurrentlySpeaking( ent, "panic" ) and IsValid( NPCVC:GetEnemyOfNPC( ent ) ) and dmginfo:GetDamage() >= ( ent:GetMaxHealth() / random( 2, 4 ) ) then
         playPanicSnd = true
     end
 
@@ -1157,19 +1161,19 @@ local function OnPostEntityTakeDamage( ent, dmginfo, tookDamage )
             SimpleTimer( 0.1, function()
                 if !IsValid( ent ) or ent:GetInternalVariable( "m_lifeState" ) != 0 then return end
                 if !vcAllowLines_LowHealth:GetBool() then return end
-                PlaySoundFile( ent, "panic" )
+                NPCVC:PlayVoiceLine( ent, "panic" )
             end )
-        elseif random( 1, 2 ) == 1 and !IsSpeaking( ent ) then
+        elseif random( 1, 2 ) == 1 and !NPCVC:IsCurrentlySpeaking( ent ) then
             local attacker = dmginfo:GetAttacker()
-            if IsValid( attacker ) and GetNPCDisposition( ent, attacker ) == D_LI then
-                PlaySoundFile( ent, "witness" )
+            if IsValid( attacker ) and NPCVC:GetDispositionOfNPC( ent, attacker ) == D_LI then
+                NPCVC:PlayVoiceLine( ent, "witness" )
             end
         end
     end
 end
 
 local function OnAcceptInput( ent, input, activator, caller, value )
-    if !IsValid( ent ) or !ent.NPCVC_Initialized or IsSpeaking( ent, "death" ) then return end
+    if !IsValid( ent ) or !ent.NPCVC_Initialized or NPCVC:IsCurrentlySpeaking( ent, "death" ) then return end
 
     if input == "BecomeRagdoll" then
         OnNPCKilled( ent, activator, caller, true )
@@ -1182,7 +1186,7 @@ local function OnAcceptInput( ent, input, activator, caller, value )
 end
 
 local function OnPropBreak( attacker, prop )
-    if !IsValid( prop ) or !prop.NPCVC_Initialized or IsSpeaking( prop, "death" ) then return end
+    if !IsValid( prop ) or !prop.NPCVC_Initialized or NPCVC:IsCurrentlySpeaking( prop, "death" ) then return end
     OnNPCKilled( prop, attacker )
 end
 
@@ -1190,8 +1194,8 @@ local function OnServerShutDown()
     if !vcSaveNPCDataOnMapChange:GetBool() then
         local mapSavedNPCs = file_Read( "npcvoicechat/mapsavednpcs.json", "DATA" )
         if mapSavedNPCs then file_Delete( "npcvoicechat/mapsavednpcs.json" ) end
-    elseif NPCVC_MapTransitionNPCs then
-        file_Write( "npcvoicechat/mapsavednpcs.json", TableToJSON( NPCVC_MapTransitionNPCs ) )
+    elseif NPCVC.MapTransitionNPCs then
+        file_Write( "npcvoicechat/mapsavednpcs.json", TableToJSON( NPCVC.MapTransitionNPCs ) )
     end
 end
 

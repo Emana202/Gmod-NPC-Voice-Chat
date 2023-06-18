@@ -30,7 +30,7 @@ if ( SERVER ) then
         self:SetMoveType( MOVETYPE_FLYGRAVITY )
 
         self.SpeechPlayTime = ( RealTime() + 5 )
-        NPCVC_TalkingNPCs[ self ] = true
+        NPCVC.TalkingNPCs[ self ] = true
 
         local owner = self:GetOwner()
         if IsValid( owner ) then
@@ -58,7 +58,7 @@ if ( SERVER ) then
     end
 
     function ENT:OnRemove()
-        NPCVC_TalkingNPCs[ self ] = nil
+        NPCVC.TalkingNPCs[ self ] = nil
     end
 
 end
