@@ -418,7 +418,7 @@ local function GetVoiceLine( ent, voiceType )
                 continue
             end
         else
-            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 1200 )
+            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 900 )
         end
 
         return voiceLine
