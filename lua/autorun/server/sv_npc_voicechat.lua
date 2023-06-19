@@ -305,21 +305,25 @@ local function UpdateData( ply )
     table_Empty( NPCVC.VoiceLines )
     for voiceType, voiceDir in pairs( vcVoiceTypeDirs ) do
         local sndDir = voiceDir:GetString() .. "/"
-        local lineTbl = {}
         local snds = file_Find( "sound/" .. sndDir .. "*", "GAME" )
+        if !snds or #snds == 0 then continue end
+
+        local lineTbl = {}
         for _, snd in ipairs( snds ) do lineTbl[ #lineTbl + 1 ] = sndDir .. snd end
         NPCVC.VoiceLines[ voiceType ] = lineTbl
     end
 
     table_Empty( NPCVC.ProfilePictures )
     local pfpPics = file_Find( "materials/npcvcdata/profilepics/*", "GAME" )
-    for _, pfpPic in ipairs( pfpPics ) do
-        NPCVC.ProfilePictures[ #NPCVC.ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
+    if pfpPics and #pfpPics > 0 then
+        for _, pfpPic in ipairs( pfpPics ) do
+            NPCVC.ProfilePictures[ #NPCVC.ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
+        end
     end
 
     table_Empty( NPCVC.UserPFPs )
     pfpPics = file_Find( "materials/npcvcdata/custompfps/*", "GAME" )
-    if pfpPics then
+    if pfpPics and #pfpPics > 0 then
         for _, pfpPic in ipairs( pfpPics ) do
             NPCVC.UserPFPs[ #NPCVC.UserPFPs + 1 ] = "npcvcdata/custompfps/" .. pfpPic
         end
@@ -418,7 +422,7 @@ local function GetVoiceLine( ent, voiceType )
                 continue
             end
         else
-            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 900 )
+            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 600 )
         end
 
         return voiceLine
@@ -428,7 +432,7 @@ local function GetVoiceLine( ent, voiceType )
 end
 
 function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
-    if !npc.NPCVC_Initialized or NPCVC.NPCBlacklist[ npc:GetClass() ] then return end
+    if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" or NPCVC.NPCBlacklist[ npc:GetClass() ] then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
@@ -695,6 +699,7 @@ local function OnEntityCreated( npc )
         end
 
         npc.NPCVC_Initialized = true
+        npc.NPCVC_IsKilled = false
         npc.NPCVC_LastEnemy = NULL
         npc.NPCVC_LastValidEnemy = NULL
         npc.NPCVC_IsLowHealth = false
@@ -709,7 +714,7 @@ local function OnEntityCreated( npc )
         else
             local height = ( npcIconHeights[ npcClass ] or ( npc:OBBMaxs().z + 10 )  )
             npc.NPCVC_VoiceIconHeight = height
-            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.33, 2.5 )
+            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 2.5 )
         end
 
         if !npc.NPCVC_IsDuplicated then
@@ -809,6 +814,7 @@ end
 
 local function OnNPCKilled( npc, attacker, inflictor, isInput )
     if !npc.NPCVC_Initialized then return end
+    npc.NPCVC_IsKilled = true
 
     if vcAllowLines_Death:GetBool() then
         NPCVC:PlayVoiceLine( npc, "death", true, isInput )
@@ -879,7 +885,7 @@ local function OnServerThink()
 
                     SimpleTimer( Rand( 2, 3.5 ), function()
                         if !IsValid( npc ) then return end
-                        NPCVC:PlayVoiceLine( npc, "death" )
+                        OnNPCKilled( npc )
                     end )
                 end
             end
@@ -1051,11 +1057,17 @@ local function OnServerThink()
                         
                         if IsValid( curEnemy ) then
                             isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
+                            if !isPanicking and !npc.IsVJBaseSNPC and npc:IsNPC() then
+                                isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
+                            end
+                            if !isPanicking then
+                                isPanicking = ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) )
+                            end
 
                             if curEnemy == lastEnemy and IsValid( lastEnemy ) and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
                                 combatLine = "idle"
                             elseif isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
-                                if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= ( npc:Visible( curEnemy ) and 1000000 or 250000 ) then
+                                if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 250000 or npc:Visible( curEnemy ) then
                                     combatLine = "panic"
                                 else 
                                     combatLine = "idle"
@@ -1070,10 +1082,6 @@ local function OnServerThink()
                             local curState = npc:GetNPCState()
 
                             if rolledSpeech then
-                                if !isPanicking then
-                                    isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
-                                end
-
                                 if curState != npc.NPCVC_LastState then
                                     if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
                                         NPCVC:PlayVoiceLine( npc, combatLine )
@@ -1093,7 +1101,7 @@ local function OnServerThink()
                         else
                             if npc.IsDrGNextbot and npc:IsDown() then 
                                 if npc.NPCVC_LastState != 1 then
-                                    NPCVC:PlayVoiceLine( npc, "death" )
+                                    OnNPCKilled( npc )
                                     npc.NPCVC_LastState = 1
                                 end
                             elseif npc.NPCVC_LastState == 1 then
@@ -1102,10 +1110,6 @@ local function OnServerThink()
                             end
 
                             if rolledSpeech then
-                                if !isPanicking then
-                                    isPanicking = ( isPanicking or ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) ) )
-                                end
-
                                 if curEnemy != lastEnemy then
                                     if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
                                         NPCVC:PlayVoiceLine( npc, combatLine )

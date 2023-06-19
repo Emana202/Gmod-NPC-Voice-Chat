@@ -138,7 +138,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
 
         local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
-        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.55, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
+        snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
 
         local playTime = ( RealTime() + playDelay )
         NPCVC.SoundEmitters[ #NPCVC.SoundEmitters + 1 ] = {
@@ -236,7 +236,7 @@ local function UpdateSounds()
             table_remove( NPCVC.SoundEmitters, index )
             continue
         end
-        
+
         local lastPos = sndData.LastPlayPos
         if IsValid( srcEnt ) then
             lastPos = srcEnt:GetPos()
@@ -260,7 +260,7 @@ local function UpdateSounds()
                 if is3D then
                     snd:Set3DEnabled( true )
                     snd:SetPos( lastPos )
-                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.55, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
+                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
