@@ -64,6 +64,11 @@ local vcPopupColorR     = CreateClientConVar( "cl_npcvoicechat_popupcolor_r", "0
 local vcPopupColorG     = CreateClientConVar( "cl_npcvoicechat_popupcolor_g", "255", nil, nil, "The green color of voice popup when the NPC is using it", 0, 255 )
 local vcPopupColorB     = CreateClientConVar( "cl_npcvoicechat_popupcolor_b", "0", nil, nil, "The blue color of voice popup when the NPC is using it", 0, 255 )
 
+local vcUniqueEnemyPopupClr    = CreateClientConVar( "cl_npcvoicechat_uniquepopupcolorforenemies", "0", nil, nil, "If NPCs that are hostile to you should have a different unique popup color", 0, 1 )
+local vcHostilePopupColorR     = CreateClientConVar( "cl_npcvoicechat_enemypopupcolor_r", "255", nil, nil, "The red color of voice popup when the hostile NPC is using it", 0, 255 )
+local vcHostilePopupColorG     = CreateClientConVar( "cl_npcvoicechat_enemypopupcolor_g", "0", nil, nil, "The green color of voice popup when the hostile NPC is using it", 0, 255 )
+local vcHostilePopupColorB     = CreateClientConVar( "cl_npcvoicechat_enemypopupcolor_b", "0", nil, nil, "The blue color of voice popup when the hostile NPC is using it", 0, 255 )
+
 CreateClientConVar( "cl_npcvoicechat_spawnvoiceprofile", "", nil, true, "The Voice Profile your newly created NPC should be spawned with. Note: This will only work if there's no voice profile specified serverside" )
 
 NPCVC                       = NPCVC or {}
@@ -200,7 +205,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 VolumeMult = volMult,
                 PlayTime = playTime,
                 LastPlayTime = ( canDrawRn and RealTime() or 0 ),
-                FirstDisplayTime = ( canDrawRn and RealTime() or 0 )
+                FirstDisplayTime = ( canDrawRn and RealTime() or 0 ),
+                IsHostile = ( vcData.EnemyPlayers[ LocalPlayer() ] or false )
             }
         end
 
@@ -384,6 +390,12 @@ local function DrawVoiceChat()
     local popupClrR = vcPopupColorR:GetInt()
     local popupClrG = vcPopupColorG:GetInt()
     local popupClrB = vcPopupColorB:GetInt()
+
+    local enemyPopupEnabled = vcUniqueEnemyPopupClr:GetBool()
+    local enemyPopupClrR = vcHostilePopupColorR:GetInt()
+    local enemyPopupClrG = vcHostilePopupColorG:GetInt()
+    local enemyPopupClrB = vcHostilePopupColorB:GetInt()
+
     local drawPfp = vcPopupDrawPfp:GetBool()
 
     for _, vcData in SortedPairsByMemberValue( drawPopupIndexes, "FirstDisplayTime" ) do
@@ -391,9 +403,9 @@ local function DrawVoiceChat()
         popup_BaseClr.a = ( drawAlpha * 255 )
 
         local vol = ( vcData.VoiceVolume * drawAlpha )
-        popup_BoxClr.r = ( vol * popupClrR )
-        popup_BoxClr.g = ( vol * popupClrG )
-        popup_BoxClr.b = ( vol * popupClrB )
+        popup_BoxClr.r = ( vol * ( ( enemyPopupEnabled and vcData.IsHostile ) and enemyPopupClrR or popupClrR ) )
+        popup_BoxClr.g = ( vol * ( ( enemyPopupEnabled and vcData.IsHostile ) and enemyPopupClrG or popupClrG ) )
+        popup_BoxClr.b = ( vol * ( ( enemyPopupEnabled and vcData.IsHostile ) and enemyPopupClrB or popupClrB ) )
         popup_BoxClr.a = ( drawAlpha * 240 )
 
         RoundedBox( 4, drawX, drawY, 246, 40, popup_BoxClr )
@@ -1212,15 +1224,38 @@ local function PopulateToolMenu()
         panel:AddItem( popupColor )
 
         popupColor:SetConVarR( "cl_npcvoicechat_popupcolor_r" )
-        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_r" ] = GetConVar( "cl_npcvoicechat_popupcolor_r" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_r" ] = vcPopupColorR
 
         popupColor:SetConVarG( "cl_npcvoicechat_popupcolor_g" )
-        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_g" ] = GetConVar( "cl_npcvoicechat_popupcolor_g" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_g" ] = vcPopupColorG
 
         popupColor:SetConVarB( "cl_npcvoicechat_popupcolor_b" )
-        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_b" ] = GetConVar( "cl_npcvoicechat_popupcolor_b" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_popupcolor_b" ] = vcPopupColorB
 
         ColoredControlHelp( true, panel, "\nThe color of the voice popup when it's liten up by NPC's voice volume" )
+
+        local enemyPopupClr = AddSettingsPanel( panel, true, "CheckBox", "Unique Popup Color For Enemies", "cl_npcvoicechat_uniquepopupcolorforenemies", "If NPCs that are hostile to you should have a different unique popup color" )
+
+        local enemyPopupClrText = panel:Help( "Enemy Popup Volume Color:" )
+        local enemyPopupClrMix = vgui_Create( "DColorMixer", panel )
+        enemyPopupClrText:SetParent( enemyPopupClrMix )
+        panel:AddItem( enemyPopupClrMix )
+
+        enemyPopupClrMix:SetConVarR( "cl_npcvoicechat_enemypopupcolor_r" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_enemypopupcolor_r" ] = vcHostilePopupColorR
+
+        enemyPopupClrMix:SetConVarG( "cl_npcvoicechat_enemypopupcolor_g" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_enemypopupcolor_g" ] = vcHostilePopupColorG
+
+        enemyPopupClrMix:SetConVarB( "cl_npcvoicechat_enemypopupcolor_b" )
+        NPCVC.ClientSettings[ "cl_npcvoicechat_enemypopupcolor_b" ] = vcHostilePopupColorB
+
+        if !vcUniqueEnemyPopupClr:GetBool() then
+            enemyPopupClrMix:SetEnabled( false )
+        end
+        function enemyPopupClr:OnChange( value )
+            enemyPopupClrMix:SetEnabled( value )
+        end
 
         if !LocalPlayer():IsSuperAdmin() then 
             panel:Help( "" )
@@ -1274,6 +1309,8 @@ local function PopulateToolMenu()
             max = 25
         } )
         AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death", "sv_npcvoicechat_speaklimit_dontaffectdeath", "If the speak limit shouldn't affect NPCs that are playing their death voiceline" )
+
+        AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speakchanceaffectsdeath", "If NPC's speech chance should also affect its playing of death voicelines." ) 
 
         AddSettingsPanel( panel, false, "CheckBox", "Save Voice Data Of Essential NPCs", "sv_npcvoicechat_savenpcdataonmapchange", "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when sometimes appearing and etc.\nRecommended to turn off when not playing any campaign!" ) 
 

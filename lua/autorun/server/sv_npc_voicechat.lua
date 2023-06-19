@@ -22,6 +22,7 @@ local TraceLine = util.TraceLine
 local IsValidProp = util.IsValidProp
 local ents_GetAll = ents.GetAll
 local FindByClass = ents.FindByClass
+local GetHumans = player.GetHumans
 local CurTime = CurTime
 local Material = Material
 local Color = Color
@@ -216,6 +217,7 @@ local vcPitchMax                = CreateConVar( "sv_npcvoicechat_voicepitch_max"
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
+local vcSpeakChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speakchanceaffectsdeath", "1", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines. Note that they will always play the voiceline if they were talking during their death", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
 
 local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
@@ -433,6 +435,7 @@ end
 
 function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" or NPCVC.NPCBlacklist[ npc:GetClass() ] then return end
+    if voiceType != "laugh" and NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
@@ -461,6 +464,16 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     sndEmitter.DontRemoveEntity = dontDeleteOnRemove
     sndEmitter:Spawn()
 
+    local enemyPlyData = npc.NPCVC_EnemyPlayers
+    if !enemyPlyData then
+        enemyPlyData = {}
+
+        for _, ply in ipairs( GetHumans() ) do
+            if NPCVC:GetDispositionOfNPC( npc, ply ) != D_HT then continue end
+            enemyPlyData[ ply ] = true
+        end
+    end
+
     local vcData = {
         Emitter = sndEmitter,
         EntIndex = npc:GetCreationID(),
@@ -469,7 +482,8 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         VolumeMult = npc.NPCVC_VoiceVolumeScale,
         Nickname = npc.NPCVC_Nickname,
         UsesRealName = npc.NPCVC_UsesRealName,
-        ProfilePicture = npc.NPCVC_ProfilePicture
+        ProfilePicture = npc.NPCVC_ProfilePicture,
+        EnemyPlayers = enemyPlyData
     }
 
     SimpleTimer( ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 ), function()
@@ -816,7 +830,7 @@ local function OnNPCKilled( npc, attacker, inflictor, isInput )
     if !npc.NPCVC_Initialized then return end
     npc.NPCVC_IsKilled = true
 
-    if vcAllowLines_Death:GetBool() then
+    if ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or !vcSpeakChanceAffectDeath:GetBool() or NPCVC:IsCurrentlySpeaking( npc ) ) and vcAllowLines_Death:GetBool() then
         NPCVC:PlayVoiceLine( npc, "death", true, isInput )
     end
 
