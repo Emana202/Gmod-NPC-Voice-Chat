@@ -191,7 +191,6 @@ NPCVC.VoiceProfiles     = NPCVC.VoiceProfiles or {}
 NPCVC.NPCVoiceProfiles  = NPCVC.NPCVoiceProfiles or {}
 NPCVC.NPCBlacklist      = NPCVC.NPCBlacklist or {}
 NPCVC.NPCWhitelist      = NPCVC.NPCWhitelist or {}
-NPCVC.IsInitialized     = NPCVC.IsInitialized or false
 NPCVC.TalkingNPCs       = NPCVC.TalkingNPCs or {}
 NPCVC.MapTransitionNPCs = NPCVC.MapTransitionNPCs or nil
 NPCVC.CachedNPCPfps     = {}
@@ -270,7 +269,7 @@ local function AddVoiceProfile( path )
 end
 
 local function UpdateData( ply )
-    if IsValid( ply ) and !ply:IsSuperAdmin() then return end
+    if ply and IsValid( ply ) and !ply:IsSuperAdmin() then return end
 
     local names = file_Read( "npcvoicechat/names.json", "DATA" )
     if !names then
@@ -338,11 +337,6 @@ local function UpdateData( ply )
 
     net.Start( "npcsqueakers_updatespawnmenu" )
     net.Broadcast()
-end
-
-if !NPCVC.IsInitialized then
-    UpdateData()
-    NPCVC.IsInitialized = true
 end
 
 concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refreshes the nicknames, voicelines and other data required for NPC's proper voice chatting" )
@@ -465,8 +459,8 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     sndEmitter:Spawn()
 
     local enemyPlyData = npc.NPCVC_EnemyPlayers
-    if !enemyPlyData then
-        enemyPlyData = {}
+    if !enemyPlyData or CurTime() > enemyPlyData.UpdateTime then
+        enemyPlyData = { UpdateTime = ( CurTime() + 30 ) }
 
         for _, ply in ipairs( GetHumans() ) do
             if NPCVC:GetDispositionOfNPC( npc, ply ) != D_HT then continue end
@@ -1227,3 +1221,4 @@ hook.Add( "PostEntityTakeDamage", "NPCSqueakers_OnPostEntityTakeDamage", OnPostE
 hook.Add( "AcceptInput", "NPCSqueakers_OnAcceptInput", OnAcceptInput )
 hook.Add( "PropBreak", "NPCSqueakers_OnPropBreak", OnPropBreak )
 hook.Add( "ShutDown", "NPCSqueakers_OnServerShutDown", OnServerShutDown )
+hook.Add( "InitPostEntity", "NPCSqueakers_OnMapInitialized", UpdateData )
