@@ -870,7 +870,7 @@ local function OnServerThink()
                         NPCVC:PlayVoiceLine( npc, "assist" )
                     elseif curState == NPC_STATE_DEAD and vcAllowLines_SpotDanger:GetBool() then
                         NPCVC:PlayVoiceLine( npc, "panic" )
-                    elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() then
+                    elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) then
                         NPCVC:PlayVoiceLine( npc, "taunt" )
                     end
                 end
