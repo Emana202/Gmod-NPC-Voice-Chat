@@ -1205,6 +1205,15 @@ local function OnPropBreak( attacker, prop )
     OnNPCKilled( prop, attacker )
 end
 
+-- No more mute combine snipers!
+local function OnEntityEmitSound( data )
+    if data.OriginalSoundName != "NPC_Sniper.Die" then return end
+
+    local ent = data.Entity
+    if !IsValid( ent ) or ent:GetClass() != "npc_sniper" then return end
+    NPCVC:PlayVoiceLine( ent, "death", true )
+end
+
 local function OnServerShutDown()
     if !vcSaveNPCDataOnMapChange:GetBool() then
         local mapSavedNPCs = file_Read( "npcvoicechat/mapsavednpcs.json", "DATA" )
@@ -1215,6 +1224,7 @@ local function OnServerShutDown()
 end
 
 hook.Add( "OnEntityCreated", "NPCSqueakers_OnEntityCreated", OnEntityCreated )
+hook.Add( "EntityEmitSound", "NPCSqueakers_OnEntityEmitSound", OnEntityEmitSound )
 hook.Add( "PlayerSpawnedNPC", "NPCSqueakers_OnPlayerSpawnedNPC", OnPlayerSpawnedNPC )
 hook.Add( "OnNPCKilled", "NPCSqueakers_OnNPCKilled", OnNPCKilled )
 hook.Add( "PlayerDeath", "NPCSqueakers_OnPlayerDeath", OnPlayerDeath )
