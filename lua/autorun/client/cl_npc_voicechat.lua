@@ -1279,12 +1279,12 @@ local function PopulateToolMenu()
         if TF2AIHats and TF2AIWeapons then AddSettingsPanel( panel, false, "CheckBox", "Team Fortress 2 Bots", "sv_npcvoicechat_allowtf2bots" ) end
         panel:Help( "------------------------------------------------------------" )
 
-        AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregagged", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
+        AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregaggednpcs", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
         AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
         AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
-        AddSettingsPanel( panel, false, "CheckBox", "Use NPC's Model Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon." )
+        AddSettingsPanel( panel, false, "CheckBox", "Use NPC's Model Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon.\nNOTE: If the NPC was spawned before, you need to update the data for it's pfp to change" )
 
         AddSettingsPanel( panel, false, "NumSlider", "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", {
             max = 100
@@ -1311,7 +1311,7 @@ local function PopulateToolMenu()
         } )
         AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death", "sv_npcvoicechat_speaklimit_dontaffectdeath", "If the speak limit shouldn't affect NPCs that are playing their death voiceline" )
 
-        AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speakchanceaffectsdeath", "If NPC's speech chance should also affect its playing of death voicelines." ) 
+        AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "If NPC's speech chance should also affect its playing of death voicelines." ) 
 
         AddSettingsPanel( panel, false, "CheckBox", "Save Voice Data Of Essential NPCs", "sv_npcvoicechat_savenpcdataonmapchange", "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when sometimes appearing and etc.\nRecommended to turn off when not playing any campaign!" ) 
 
