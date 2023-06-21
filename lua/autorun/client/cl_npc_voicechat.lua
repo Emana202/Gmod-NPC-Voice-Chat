@@ -3,6 +3,7 @@ local ipairs = ipairs
 local pairs = pairs
 local SortedPairsByValue = SortedPairsByValue
 local IsValid = IsValid
+local ispanel = ispanel
 local SimpleTimer = timer.Simple
 local random = math.random
 local string_sub = string.sub
@@ -385,7 +386,9 @@ local function DrawVoiceChat()
 
     if !canDrawSomething then return end
     local drawX, drawY = ( scrSizeW - 298 ), ( scrSizeH - 142 )
-    drawY = ( drawY - ( 44 * #g_VoicePanelList:GetChildren() ) )
+
+    local plyPopups = g_VoicePanelList
+    if ispanel( plyPopups ) then drawY = ( drawY - ( 44 * #plyPopups:GetChildren() ) ) end
 
     local popupClrR = vcPopupColorR:GetInt()
     local popupClrG = vcPopupColorG:GetInt()
