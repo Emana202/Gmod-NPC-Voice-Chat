@@ -222,6 +222,29 @@ net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), net.ReadFloat(), true )
 end )
 
+local function SetMouthFlexes( ent, weight )
+    local flexID = ent:GetFlexIDByName( "jaw_drop" )
+    if flexID then ent:SetFlexWeight( flexID, weight ) end
+
+    flexID = ent:GetFlexIDByName( "left_drop" )
+    if flexID then ent:SetFlexWeight( flexID, weight ) end
+
+    flexID = ent:GetFlexIDByName( "right_drop" )
+    if flexID then ent:SetFlexWeight( flexID, weight ) end
+
+    flexID = ent:GetFlexIDByName( "left_mouth_drop")
+    if flexID then ent:SetFlexWeight( flexID, weight ) end
+
+    flexID = ent:GetFlexIDByName( "right_mouth_drop")
+    if flexID then ent:SetFlexWeight( flexID, weight ) end
+
+    flexID = ent:GetFlexIDByName( "mouth_sideways" )
+    if flexID then ent:SetFlexWeight( flexID, 0.5 ) end
+
+    flexID = ent:GetFlexIDByName( "jaw_sideways" )
+    if flexID then ent:SetFlexWeight( flexID, 0.5 ) end
+end
+
 local function UpdateSounds()
     if #NPCVC.SoundEmitters == 0 then return end
 
@@ -240,14 +263,9 @@ local function UpdateSounds()
 
         if !IsValid( ent ) or !IsValid( snd ) or !playTime and snd:GetState() == GMOD_CHANNEL_STOPPED or netFunc and !IsValid( srcEnt ) and ent:GetRemoveOnNoSource() then
             if IsValid( snd ) then snd:Stop() end
+            if IsValid( srcEnt ) then SetMouthFlexes( srcEnt, 0.0 ) end
             table_remove( NPCVC.SoundEmitters, index )
             continue
-        end
-
-        local lastPos = sndData.LastPlayPos
-        if IsValid( srcEnt ) then
-            lastPos = srcEnt:GetPos()
-            sndData.LastPlayPos = lastPos
         end
 
         if playTime and realTime >= sndData.PlayTime then
@@ -256,6 +274,18 @@ local function UpdateSounds()
         end
 
         if enabled then
+            local lastPos = sndData.LastPlayPos
+            if IsValid( srcEnt ) then
+                lastPos = srcEnt:GetPos()
+                sndData.LastPlayPos = lastPos
+                
+                if srcEnt:IsRagdoll() then
+                    local leftC, rightC = snd:GetLevel()
+                    local voiceLvl = ( ( leftC + rightC ) / 2 )
+                    SetMouthFlexes( srcEnt, voiceLvl )
+                end
+            end
+
             if isGlobal then
                 snd:SetVolume( volume )
                 snd:Set3DEnabled( false )
@@ -1293,11 +1323,11 @@ local function PopulateToolMenu()
             max = 100
         } )
 
-        local minPitch = AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_voicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
+        local minPitch = AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
             min = 10,
             max = 100
         } )
-        local maxPitch = AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_voicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
+        local maxPitch = AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
             min = 100,
             max = 255
         } )
