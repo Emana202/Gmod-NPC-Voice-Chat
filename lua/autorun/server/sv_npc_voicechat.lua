@@ -226,7 +226,7 @@ local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
-local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines. Note that they will always play the voiceline if they were talking during their death", 0, 1 )
+local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
 
 local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
@@ -854,8 +854,10 @@ local function OnNPCKilled( npc, attacker, inflictor, isInput )
     if !npc.NPCVC_Initialized then return end
     npc.NPCVC_IsKilled = true
 
-    if ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or !vcVoiceChanceAffectDeath:GetBool() or NPCVC:IsCurrentlySpeaking( npc ) ) and vcAllowLines_Death:GetBool() then
+    if ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or !vcVoiceChanceAffectDeath:GetBool() ) and vcAllowLines_Death:GetBool() then
         NPCVC:PlayVoiceLine( npc, "death", true, isInput )
+    else
+        NPCVC:StopCurrentSpeech( npc )
     end
 
     CheckNearbyNPCOnDeath( npc, attacker )
