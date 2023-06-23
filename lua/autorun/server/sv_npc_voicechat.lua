@@ -121,17 +121,17 @@ local noStateUseNPCs = {
 local npcIconHeights = {
     [ "monster_turret" ] = -60,
     [ "monster_miniturret" ] = -60,
-    [ "npc_barnacle" ] = -64,
-    [ "monster_barnacle" ] = -64,
+    [ "npc_barnacle" ] = { 100, -64 },
+    [ "monster_barnacle" ] = { 100, -64 },
     [ "npc_combine_camera" ] = -70,
     [ "npc_turret_ceiling" ] = -70,
     [ "npc_manhack" ] = 24,
     [ "npc_cscanner" ] = 24,
     [ "npc_clawscanner" ] = 24,
-    [ "npc_strider" ] = 50,
+    [ "npc_strider" ] = { 275, 50 },
     [ "monster_houndeye" ] = 58,
     [ "monster_bullchicken" ] = 58,
-    [ "npc_helicopter" ] = 80,
+    [ "npc_helicopter" ] = { 275, 90 },
     [ "monster_apache" ] = 80,
     [ "npc_antlionguard" ] = 150,
     [ "npc_dog" ] = 128,
@@ -1015,20 +1015,23 @@ local function OnServerThink()
                     if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
                         NPCVC:PlayVoiceLine( npc, "death", true )
                     end
-                elseif lifeState == 0 then
-                    local barnacled = npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE )
-                    if !barnacled then
-                        local curAct = npc:GetSequenceActivityName( npc:GetSequence() )
-                        barnacled = ( curAct == "ACT_BARNACLE_PULL" or curAct == "ACT_BARNACLE_CHEW" or curAct == "ACT_BARNACLE_CHOMP" )
-                    end
-
+                elseif lifeState == 0 then 
+                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or npc:GetNPCState() == NPC_STATE_PRONE )
                     local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
                     local stopSpeech = ( rolledSpeech == true )
+                    
                     if isPurelyPanic then
-                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 or ( npc:GetCurrentSchedule() + 1000000000 ) == GetScheduleID( "SCHED_ANTLION_FLIP" ) ) )
+                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 ) )
 
-                        local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
-                        if !isPurelyPanic and engineStallT then isPurelyPanic = ( engineStallT > 0.5 ) end
+                        if !isPurelyPanic then
+                            local curSched = ( npc:GetCurrentSchedule() + 1000000000 )
+                            isPurelyPanic = ( curSched == GetScheduleID( "SCHED_ANTLION_FLIP" ) or curSched == GetScheduleID( "SCHED_COMBINE_BUGBAIT_DISTRACTION" ) )
+                        end
+
+                        if !isPurelyPanic then 
+                            local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
+                            isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
+                        end
 
                         if !isPurelyPanic and npc:GetMoveType() == MOVETYPE_VPHYSICS then
                             local phys = npc:GetPhysicsObject()
@@ -1053,7 +1056,7 @@ local function OnServerThink()
                             NPCVC:PlayVoiceLine( npc, "panic" )
                         end
 
-                        if barnacled then
+                        if barnacled and !hlsNPCs[ npcClass ] then
                             SimpleTimer( 0.1, function()
                                 if !IsValid( npc ) then return end
 
