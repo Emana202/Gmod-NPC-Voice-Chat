@@ -74,7 +74,9 @@ CreateClientConVar( "cl_npcvoicechat_spawnvoiceprofile", "", nil, true, "The Voi
 
 NPCVC                       = NPCVC or {}
 NPCVC.SoundEmitters         = NPCVC.SoundEmitters or {}
-NPCVC.CachedNamePhrases     = NPCVC.CachedNamePhrases or {}
+NPCVC.CachedNamePhrases     = {
+    [ "#npc_apcdriver" ] = "Combine APC"
+}
 NPCVC.VoicePopups           = {}
 NPCVC.VoiceProfiles         = {}
 NPCVC.CachedMaterials       = {}
@@ -218,6 +220,20 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
     end )
 end
 
+net.Receive( "npcsqueakers_getrenderbounds", function() 
+    local ent = net.ReadEntity()
+
+    SimpleTimer( 0.33, function()
+        if !IsValid( ent ) then return end
+
+        local mins, maxs = ent:GetRenderBounds()
+        net.Start( "npcsqueakers_sendrenderbounds" )
+            net.WriteVector( mins )
+            net.WriteVector( maxs )
+        net.SendToServer()
+    end )
+end )
+
 net.Receive( "npcsqueakers_playsound", function()
     PlaySoundFile( net.ReadString(), net.ReadTable(), net.ReadFloat(), true )
 end )
@@ -321,8 +337,9 @@ local function DrawVoiceIcons()
         ang:RotateAroundAxis( ang:Up(), -90 )
         ang:RotateAroundAxis( ang:Forward(), 90 )
 
-        local pos = ( sndData.LastPlayPos + vector_up * sndData.IconHeight )
-        local scale = max( 0.66, 1 * ( vcScaleIcon:GetBool() and sndData.VolumeMult or 1 ) )
+        local height = sndData.IconHeight
+        local pos = ( sndData.LastPlayPos + vector_up * height )
+        local scale = max( 0.66, 1 * ( vcScaleIcon:GetBool() and max( 1, ( height / 80 ) ) or 1 ) )
         if scale > 1 then 
             local ent = sndData.Entity
             if IsValid( ent ) then

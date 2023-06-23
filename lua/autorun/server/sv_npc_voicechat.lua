@@ -107,7 +107,8 @@ local drownNPCs = {
     [ "npc_headcrab_black" ] = true,
     [ "npc_headcrab_fast" ] = true,
     [ "npc_rollermine" ] = true,
-    [ "npc_antlion" ] = true
+    [ "npc_antlion" ] = true,
+    [ "npc_antlion_worker" ] = true
 }
 local noStateUseNPCs = {
     [ "npc_barnacle" ] = true,
@@ -126,15 +127,19 @@ local npcIconHeights = {
     [ "npc_manhack" ] = 24,
     [ "npc_cscanner" ] = 24,
     [ "npc_clawscanner" ] = 24,
+    [ "npc_strider" ] = 50,
     [ "monster_houndeye" ] = 58,
     [ "monster_bullchicken" ] = 58,
-    [ "npc_helicopter" ] = 100,
+    [ "npc_helicopter" ] = 80,
+    [ "monster_apache" ] = 80,
     [ "npc_antlionguard" ] = 150,
     [ "npc_dog" ] = 128,
-    [ "npc_combinegunship" ] = 128,
+    [ "npc_combinegunship" ] = { 250, 128 },
     [ "npc_combinedropship" ] = 240,
-    [ "monster_bigmomma" ] = 240,
-    [ "monster_gargantua" ] = 250
+    [ "monster_bigmomma" ] = { 175, 180 },
+    [ "monster_gargantua" ] = { 175, 250 },
+    [ "monster_tentacle" ] = 600,
+    [ "monster_nihilanth" ] = 750
 }
 local hlsNPCs = {
     [ "monster_alien_grunt" ] = true,
@@ -159,6 +164,7 @@ local hlsNPCs = {
     [ "monster_barney" ] = true,
     [ "monster_turret" ] = true,
     [ "monster_miniturret" ] = true,
+    [ "monster_apache" ] = true,
     [ "monster_sentry" ] = true
 }
 local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist" }
@@ -182,6 +188,8 @@ util.AddNetworkString( "npcsqueakers_resetsettings" )
 util.AddNetworkString( "npcsqueakers_writedata" )
 util.AddNetworkString( "npcsqueakers_requestdata" )
 util.AddNetworkString( "npcsqueakers_returndata" )
+util.AddNetworkString( "npcsqueakers_getrenderbounds" )
+util.AddNetworkString( "npcsqueakers_sendrenderbounds" )
 
 NPCVC                   = NPCVC or {}
 NPCVC.NickNames         = NPCVC.NickNames or {}
@@ -487,7 +495,7 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         net.Start( "npcsqueakers_playsound" )
             net.WriteString( sndName )
             net.WriteTable( vcData )
-            net.WriteFloat( !vcSlightDelay:GetBool() and 0 or Rand( 0.0, 0.75 ) )
+            net.WriteFloat( !vcSlightDelay:GetBool() and 0 or Rand( 0.1, 0.75 ) )
         net.Broadcast()
     end )
     if IsValid( oldEmitter ) then oldEmitter:Remove() end
@@ -707,6 +715,7 @@ local function OnEntityCreated( npc )
         if !whitelistVoice then
             if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
+            if npc.Base == "npc_vj_tankg_base" then return end
         end
 
         npc.NPCVC_Initialized = true
@@ -724,8 +733,25 @@ local function OnEntityCreated( npc )
             npc.NPCVC_VoiceVolumeScale = 2
         else
             local height = ( npcIconHeights[ npcClass ] or ( npc:OBBMaxs().z + 10 )  )
-            npc.NPCVC_VoiceIconHeight = height
-            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 2.5 )
+            local isTwo = istable( height )
+
+            npc.NPCVC_VoiceIconHeight = ( isTwo and height[ 2 ] or height )
+            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( isTwo and height[ 1 ] or height ) / 72 ), 0.66, 3.33 )
+
+            if !isTwo then
+                net.Start( "npcsqueakers_getrenderbounds" )
+                    net.WriteEntity( npc )
+                net.Broadcast()
+
+                net.Receive( "npcsqueakers_sendrenderbounds", function()
+                    if !IsValid( npc ) then return end
+                    local mins, maxs = net.ReadVector(), net.ReadVector()
+                    local height = ( abs( mins.z ) + maxs.z )
+
+                    npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
+                    npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
+                end )
+            end
         end
 
         if !npc.NPCVC_IsDuplicated then
@@ -1003,9 +1029,9 @@ local function OnServerThink()
                         local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
                         if !isPurelyPanic and engineStallT then isPurelyPanic = ( engineStallT > 0.5 ) end
 
-                        if !isPurelyPanic then
+                        if !isPurelyPanic and npc:GetMoveType() == MOVETYPE_VPHYSICS then
                             local phys = npc:GetPhysicsObject()
-                            if IsValid( phys ) and phys:GetVelocity():Length() >= 500 and IsValidProp( npc:GetModel() ) then
+                            if IsValid( phys ) and phys:GetVelocity():Length() >= 750 and IsValidProp( npc:GetModel() ) then
                                 isPurelyPanic = true
                                 stopSpeech = true
                             end
