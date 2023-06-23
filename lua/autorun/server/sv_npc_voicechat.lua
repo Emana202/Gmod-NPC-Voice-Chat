@@ -3,6 +3,7 @@ local ipairs = ipairs
 local pairs = pairs
 local RandomPairs = RandomPairs
 local IsValid = IsValid
+local isentity = isentity
 local SimpleTimer = timer.Simple
 local random = math.random
 local randomseed = math.randomseed
@@ -278,7 +279,7 @@ local function AddVoiceProfile( path )
 end
 
 local function UpdateData( ply )
-    if ply and IsValid( ply ) and !ply:IsSuperAdmin() then return end
+    if isentity( ply ) and IsValid( ply ) and !ply:IsSuperAdmin() then return end
 
     local names = file_Read( "npcvoicechat/names.json", "DATA" )
     if !names then
