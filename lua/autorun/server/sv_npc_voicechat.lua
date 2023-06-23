@@ -1016,7 +1016,7 @@ local function OnServerThink()
                         NPCVC:PlayVoiceLine( npc, "death", true )
                     end
                 elseif lifeState == 0 then 
-                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or npc:GetNPCState() == NPC_STATE_PRONE )
+                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or npc:IsNPC() and npc:GetNPCState() == NPC_STATE_PRONE )
                     local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
                     local stopSpeech = ( rolledSpeech == true )
                     
