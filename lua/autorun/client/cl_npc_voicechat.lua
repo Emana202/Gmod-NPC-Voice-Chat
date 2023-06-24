@@ -1336,7 +1336,7 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
         AddSettingsPanel( panel, false, "CheckBox", "Use NPC's Model Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon.\nNOTE: If the NPC was spawned before, you need to update the data for it's pfp to change" )
 
-        AddSettingsPanel( panel, false, "NumSlider", "Force Speech Chance", "sv_npcvoicechat_forcespeechchance", "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", {
+        AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance when newly spawning", {
             max = 100
         } )
 

@@ -225,7 +225,7 @@ local vcPitchMin                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch
 local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_max", "105", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
-local vcForceSpeechChance       = CreateConVar( "sv_npcvoicechat_forcespeechchance", "0", cvarFlag, "If above zero, will set every newly spawned NPC's speech chance to this value. Set to zero to disable", 0, 100 )
+local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance when newly spawning", 0, 100 )
 local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
 
@@ -756,8 +756,7 @@ local function OnEntityCreated( npc )
         end
 
         if !npc.NPCVC_IsDuplicated then
-            local speechChance = vcForceSpeechChance:GetInt()
-            if speechChance == 0 then speechChance = random( 1, 100 ) end
+            local speechChance = random( vcMinSpeechChance:GetInt(), 100 )
             npc.NPCVC_SpeechChance = speechChance
             
             local voicePitch = random( vcPitchMin:GetInt(), vcPitchMax:GetInt() )
