@@ -707,7 +707,7 @@ local function OnEntityCreated( npc )
         if !IsValid( npc ) then return end
         
         npc.NPCVC_LastSeenEnemyTime = 0
-        npc.NPCVC_NextIdleSpeak = ( CurTime() + Rand( 0, 10 ) )
+        npc.NPCVC_NextIdleSpeak = ( CurTime() + random( 0, 15 ) )
         npc.NPCVC_NextDangerSoundTime = 0
         if npc.NPCVC_Initialized then return end
 
@@ -1183,7 +1183,7 @@ local function OnServerThink()
         end
 
         if curTime >= npc.NPCVC_NextIdleSpeak then
-            npc.NPCVC_NextIdleSpeak = ( curTime + Rand( 0, 10 ) )
+            npc.NPCVC_NextIdleSpeak = ( curTime + random( 0, 15 ) )
         end
     end
 end
