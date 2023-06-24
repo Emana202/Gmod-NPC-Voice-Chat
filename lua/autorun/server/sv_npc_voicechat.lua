@@ -1018,21 +1018,31 @@ local function OnServerThink()
                         NPCVC:PlayVoiceLine( npc, "death", true )
                     end
                 elseif lifeState == 0 then 
-                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or npc:IsNPC() and npc:GetNPCState() == NPC_STATE_PRONE )
+                    local isNPC = npc:IsNPC()
+                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or isNPC and npc:GetNPCState() == NPC_STATE_PRONE )
                     local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
                     local stopSpeech = ( rolledSpeech == true )
-                    
-                    if isPurelyPanic then
-                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or npc:IsNPC() and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 ) )
 
-                        if !isPurelyPanic then
+                    if isPurelyPanic then
+                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or isNPC and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 ) )
+
+                        if !isPurelyPanic and isNPC then
                             local curSched = ( npc:GetCurrentSchedule() + 1000000000 )
                             isPurelyPanic = ( curSched == GetScheduleID( "SCHED_ANTLION_FLIP" ) or curSched == GetScheduleID( "SCHED_COMBINE_BUGBAIT_DISTRACTION" ) )
-                        end
 
-                        if !isPurelyPanic then 
-                            local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
-                            isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
+                            if !isPurelyPanic then 
+                                local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
+                                isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
+                            end
+
+                            if !isPurelyPanic and drownNPCs[ npcClass ] then
+                                waterCheckTr.start = npc:WorldSpaceCenter()
+                                waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
+                                waterCheckTr.filter = npc
+                                waterCheckTr.collisiongroup = npc:GetCollisionGroup()
+
+                                isPurelyPanic = ( band( PointContents( TraceLine( waterCheckTr ).HitPos ), CONTENTS_WATER ) != 0 )
+                            end
                         end
 
                         if !isPurelyPanic and npc:GetMoveType() == MOVETYPE_VPHYSICS then
@@ -1041,15 +1051,6 @@ local function OnServerThink()
                                 isPurelyPanic = true
                                 stopSpeech = true
                             end
-                        end
-
-                        if !isPurelyPanic and drownNPCs[ npcClass ] then
-                            waterCheckTr.start = npc:WorldSpaceCenter()
-                            waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
-                            waterCheckTr.filter = npc
-                            waterCheckTr.collisiongroup = npc:GetCollisionGroup()
-
-                            isPurelyPanic = ( band( PointContents( TraceLine( waterCheckTr ).HitPos ), CONTENTS_WATER ) != 0 )
                         end
                     end
 
@@ -1100,7 +1101,7 @@ local function OnServerThink()
                         
                         if IsValid( curEnemy ) then
                             isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
-                            if !isPanicking and !npc.IsVJBaseSNPC and npc:IsNPC() then
+                            if !isPanicking and !npc.IsVJBaseSNPC and isNPC then
                                 isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
                             end
                             if !isPanicking then
@@ -1118,10 +1119,10 @@ local function OnServerThink()
                             end
                         end
 
-                        if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and npc:IsNPC() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
+                        if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and isNPC and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
                             NPCVC:PlayVoiceLine( npc, "panic" )
                             npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
-                        elseif npc:IsNPC() and !npc.IsVJBaseSNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
+                        elseif isNPC and !npc.IsVJBaseSNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
                             if rolledSpeech then
