@@ -282,7 +282,7 @@ local function UpdateSounds()
     local volume = vcPlayVol:GetFloat()
     local fadeDist = vcPlayDist:GetInt()
     local isGlobal = vcGlobalVC:GetBool()
-    local plyPos = LocalPlayer():GetPos()
+    local curPos = EyePos()
     local realTime = RealTime()
 
     for index, sndData in ipairs( NPCVC.SoundEmitters ) do
@@ -330,7 +330,7 @@ local function UpdateSounds()
                     snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
-                    sndVol = Clamp( sndVol / ( plyPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
+                    sndVol = Clamp( sndVol / ( curPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
                 end
 
                 snd:SetVolume( sndVol )
@@ -381,7 +381,7 @@ local drawPopupIndexes = {}
 local function DrawVoiceChat()
     if !vcShowPopups:GetBool() or !vcEnabled:GetBool() then return end
 
-    local plyPos = LocalPlayer():GetPos()
+    local curPos = EyePos()
     local fadeoutTime = vcPopupFadeTime:GetFloat()
     local displayDist = vcPopupDist:GetInt()
     displayDist = ( displayDist * displayDist )
@@ -416,7 +416,7 @@ local function DrawVoiceChat()
             local leftChan, rightChan = snd:GetLevel()
             sndVol = ( ( leftChan + rightChan ) * 0.5 )
 
-            if displayDist == 0 or plyPos:DistToSqr( lastPos ) <= displayDist then
+            if displayDist == 0 or curPos:DistToSqr( lastPos ) <= displayDist then
                 vcData.LastPlayTime = realTime
 
                 if vcData.FirstDisplayTime == 0 then

@@ -168,7 +168,7 @@ local hlsNPCs = {
     [ "monster_apache" ] = true,
     [ "monster_sentry" ] = true
 }
-local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist" }
+local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist", [ "fall" ] = "npcvoicechat/vo/fall" }
 local ignoreGagTypes = {
     [ "death" ] = true,
     [ "panic" ] = true,
@@ -268,11 +268,14 @@ local function AddVoiceProfile( path )
             local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME" )
             if !voicelines or #voicelines == 0 then continue end
 
+            local typeName = voiceType
+            if voiceType == "fall" then typeName = "panic" end
+
             NPCVC.VoiceProfiles[ voicePfp ] = ( NPCVC.VoiceProfiles[ voicePfp ] or {} )
-            NPCVC.VoiceProfiles[ voicePfp ][ voiceType ] = {}
+            NPCVC.VoiceProfiles[ voicePfp ][ typeName ] = {}
 
             for _, voiceline in ipairs( voicelines ) do
-                table_insert( NPCVC.VoiceProfiles[ voicePfp ][ voiceType ], voiceTypePath .. "/" .. voiceline )
+                table_insert( NPCVC.VoiceProfiles[ voicePfp ][ typeName ], voiceTypePath .. "/" .. voiceline )
             end
         end
     end
@@ -1128,7 +1131,7 @@ local function OnServerThink()
 
                             if rolledSpeech then
                                 if curState != npc.NPCVC_LastState then
-                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
                                         NPCVC:PlayVoiceLine( npc, combatLine )
                                     end
                                 elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
@@ -1156,7 +1159,7 @@ local function OnServerThink()
 
                             if rolledSpeech then
                                 if curEnemy != lastEnemy then
-                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
                                         NPCVC:PlayVoiceLine( npc, combatLine )
                                     end
                                 elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
