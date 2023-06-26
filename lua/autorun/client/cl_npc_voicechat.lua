@@ -6,6 +6,7 @@ local IsValid = IsValid
 local ispanel = ispanel
 local SimpleTimer = timer.Simple
 local random = math.random
+local abs = math.abs
 local string_sub = string.sub
 local string_find = string.find
 local lower = string.lower
@@ -35,6 +36,8 @@ local surface_SetMaterial = surface.SetMaterial
 local surface_DrawRect = surface.DrawRect
 local surface_DrawTexturedRect = surface.DrawTexturedRect
 local End3D2D = cam.End3D2D
+local CreateTimer = timer.Create
+local RemoveTimer = timer.Remove
 local file_Find = file.Find
 local JSONToTable = util.JSONToTable
 local TableToJSON = util.TableToJSON
@@ -222,11 +225,22 @@ end
 
 net.Receive( "npcsqueakers_getrenderbounds", function() 
     local ent = net.ReadEntity()
+    if !IsValid( ent ) then return end
 
-    SimpleTimer( 0.33, function()
-        if !IsValid( ent ) then return end
+    local _, curHeight = ent:GetRenderBounds()
+    curHeight = curHeight.z
+
+    local timerName = "npcsqueakers_adjustbounds" .. ent:EntIndex() .. CurTime()
+    CreateTimer( timerName, 1.0, 0, function()
+        if !IsValid( ent ) then RemoveTimer( timerName ) return end
 
         local mins, maxs = ent:GetRenderBounds()
+        if abs( maxs.z - curHeight ) > 25 then
+            curHeight = maxs.z
+            return 
+        end
+        RemoveTimer( timerName )
+
         net.Start( "npcsqueakers_sendrenderbounds" )
             net.WriteVector( mins )
             net.WriteVector( maxs )

@@ -121,8 +121,8 @@ local noStateUseNPCs = {
 local npcIconHeights = {
     [ "monster_turret" ] = -60,
     [ "monster_miniturret" ] = -60,
-    [ "npc_barnacle" ] = { 100, -64 },
-    [ "monster_barnacle" ] = { 100, -64 },
+    [ "npc_barnacle" ] = { 80, -64 },
+    [ "monster_barnacle" ] = { 80, -64 },
     [ "npc_combine_camera" ] = -70,
     [ "npc_turret_ceiling" ] = -70,
     [ "npc_manhack" ] = 24,
@@ -132,7 +132,7 @@ local npcIconHeights = {
     [ "monster_houndeye" ] = 58,
     [ "monster_bullchicken" ] = 58,
     [ "npc_helicopter" ] = { 275, 90 },
-    [ "monster_apache" ] = 80,
+    [ "monster_apache" ] = { 225, 70 },
     [ "npc_antlionguard" ] = 150,
     [ "npc_dog" ] = 128,
     [ "npc_combinegunship" ] = { 250, 128 },
@@ -408,15 +408,14 @@ end
 
 local function GetVoiceLine( ent, voiceType )
     local voiceTbl
-
     local voicePfp = NPCVC.VoiceProfiles[ ent.NPCVC_VoiceProfile ]
-    if voicePfp then
-        voiceTbl = voicePfp[ voiceType ]
-    else
+    if voicePfp then voiceTbl = voicePfp[ voiceType ] end
+
+    if !voicePfp or ( !voiceTbl or #voiceTbl == 0 ) and vcVoiceProfileFallback:GetBool() then
         local voicelineTbl = ( ( LambdaVoiceLinesTable and vcUseLambdaVoicelines:GetBool() ) and LambdaVoiceLinesTable or NPCVC.VoiceLines ) 
         voiceTbl = voicelineTbl[ voiceType ]
     end
-    if ( !voiceTbl or #voiceTbl == 0 ) and ( !voicePfp or !vcVoiceProfileFallback:GetBool() ) then return end
+    if !voiceTbl or #voiceTbl == 0 then return end
 
     local realTime = RealTime()
     randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
@@ -424,18 +423,14 @@ local function GetVoiceLine( ent, voiceType )
     for _, voiceLine in RandomPairs( voiceTbl ) do
         local useTime = NPCVC.LastUsedLines[ voiceLine ]
         if useTime then
-            if realTime > useTime then
-                NPCVC.LastUsedLines[ voiceLine ] = nil
-            else
-                continue
-            end
+            if realTime < useTime then continue end
+            NPCVC.LastUsedLines[ voiceLine ] = nil
         else
-            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 600 )
+            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 900 )
         end
 
         return voiceLine
     end
-
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
@@ -740,18 +735,25 @@ local function OnEntityCreated( npc )
             npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( isTwo and height[ 1 ] or height ) / 72 ), 0.66, 3.33 )
 
             if !isTwo then
-                net.Start( "npcsqueakers_getrenderbounds" )
-                    net.WriteEntity( npc )
-                net.Broadcast()
-
-                net.Receive( "npcsqueakers_sendrenderbounds", function()
-                    if !IsValid( npc ) then return end
-                    local mins, maxs = net.ReadVector(), net.ReadVector()
+                local mins, maxs = npc:GetModelRenderBounds()
+                if !mins:IsZero() or !maxs:IsZero() then
                     local height = ( abs( mins.z ) + maxs.z )
-
                     npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
                     npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
-                end )
+                else
+                    net.Start( "npcsqueakers_getrenderbounds" )
+                        net.WriteEntity( npc )
+                    net.Broadcast()
+
+                    net.Receive( "npcsqueakers_sendrenderbounds", function()
+                        if !IsValid( npc ) then return end
+                        local mins, maxs = net.ReadVector(), net.ReadVector()
+                        local height = ( abs( mins.z ) + maxs.z )
+
+                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
+                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
+                    end )
+                end
             end
         end
 
