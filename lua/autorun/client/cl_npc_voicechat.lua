@@ -16,6 +16,7 @@ local RealTime = RealTime
 local PlayFile = sound.PlayFile
 local EyeAngles = EyeAngles
 local LocalPlayer = LocalPlayer
+local EyePos = EyePos
 local table_remove = table.remove
 local table_HasValue = table.HasValue
 local table_Merge = table.Merge
@@ -198,7 +199,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
 
             local displayDist = vcPopupDist:GetInt()
             displayDist = ( displayDist * displayDist )
-            local canDrawRn = ( displayDist == 0 or LocalPlayer():GetPos():DistToSqr( playPos ) <= displayDist )
+            local canDrawRn = ( displayDist == 0 or EyePos():DistToSqr( playPos ) <= displayDist )
 
             NPCVC.VoicePopups[ entIndex ] = {
                 Nick = nickName,
