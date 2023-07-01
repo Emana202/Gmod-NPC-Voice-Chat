@@ -457,8 +457,13 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         if speakLimit > 0 and table_Count( NPCVC.TalkingNPCs ) >= speakLimit then return end
     end
 
-    local sndName = GetVoiceLine( npc, voiceType )
-    if !sndName then return end
+    local sndName = defVoiceTypeDirs[ voiceType ]
+    if sndName then 
+        sndName = GetVoiceLine( npc, voiceType ) 
+        if !sndName then return end
+    else
+        sndName = voiceType
+    end
 
     local sndEmitter = ents_Create( "npc_vc_sndemitter" )
     if !IsValid( sndEmitter ) then return end
@@ -1114,7 +1119,7 @@ local function OnServerThink()
 
                             if curEnemy == lastEnemy and IsValid( lastEnemy ) and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
                                 combatLine = "idle"
-                            elseif isPanicking or lowHP and random( 1, ( 6 * ( lowHP / ( npc:Health() / npc:GetMaxHealth() ) ) ) ) == 1 then
+                            elseif isPanicking or lowHP and random( 1, ( 8 * ( ( npc:Health() / npc:GetMaxHealth() ) / lowHP ) ) ) == 1 then
                                 if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 250000 or npc:Visible( curEnemy ) then
                                     combatLine = "panic"
                                 else 

@@ -183,7 +183,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 local nickPhrase = NPCVC.CachedNamePhrases[ nickName ]
                 if !nickPhrase then
                     nickPhrase = GetPhrase( nickName )
-                    if ( !nickPhrase or nickPhrase == nickName ) and IsValid( srcEnt ) then
+                    if ( !nickPhrase or nickPhrase[ 1 ] == "#" ) and IsValid( srcEnt ) then
                         local npcName = list_Get( "NPC" )[ srcEnt:GetClass() ]
                         nickPhrase = ( npcName and npcName.Name or nickPhrase )
                         if nickPhrase and nickPhrase != nickName then NPCVC.CachedNamePhrases[ nickName ] = nickPhrase end
@@ -193,7 +193,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 end
                 nickName = nickPhrase
             end
-            if #nickName > 24 then 
+            if #nickName > 23 then 
                 nickName = string_sub( nickName, 0, 22 ) .. "..." 
             end
 
