@@ -64,6 +64,7 @@ local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "1",
 local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "0", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
 local vcPopupDrawPfp    = CreateClientConVar( "cl_npcvoicechat_popupdrawpfp", "1", nil, nil, "If the NPC's voice popup should draw its profile picture", 0, 1 )
+local vcPopupShiftLeft  = CreateClientConVar( "cl_npcvoicechat_popupshiftleft", "0", nil, nil, "If the NPC's voice popup should shift to the left if it's being drawn offscreen due to lots of other", 0, 1 )
 
 local vcPopupColorR     = CreateClientConVar( "cl_npcvoicechat_popupcolor_r", "0", nil, nil, "The red color of voice popup when the NPC is using it", 0, 255 )
 local vcPopupColorG     = CreateClientConVar( "cl_npcvoicechat_popupcolor_g", "255", nil, nil, "The green color of voice popup when the NPC is using it", 0, 255 )
@@ -141,8 +142,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             return
         end
 
-        local srcEnt = GetSoundSource( ent )
-        local playPos = ( IsValid( srcEnt ) and srcEnt:GetPos() or ent:GetPos() )
+        local playPos = vcData.StartPos
         snd:SetPos( playPos )
 
         local playRate = ( vcData.Pitch / 100 )
@@ -152,7 +152,9 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
         snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
 
-        local playTime = ( RealTime() + playDelay )
+        local realTime = RealTime()
+        local playTime = ( realTime + playDelay )
+        
         NPCVC.SoundEmitters[ #NPCVC.SoundEmitters + 1 ] = {
             Entity = ent,
             Sound = snd,
@@ -160,7 +162,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             VolumeMult = volMult,
             Is3D = is3D,
             IconHeight = vcData.IconHeight,
-            PlayTime = playTime
+            PlayTime = playTime,
+            IsDormant = vcData.IsDormant
         }
 
         local entIndex = vcData.EntIndex
@@ -183,8 +186,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 local nickPhrase = NPCVC.CachedNamePhrases[ nickName ]
                 if !nickPhrase then
                     nickPhrase = GetPhrase( nickName )
-                    if ( !nickPhrase or nickPhrase[ 1 ] == "#" ) and IsValid( srcEnt ) then
-                        local npcName = list_Get( "NPC" )[ srcEnt:GetClass() ]
+                    if ( !nickPhrase or nickPhrase[ 1 ] == "#" )  then
+                        local npcName = list_Get( "NPC" )[ vcData.Classname ]
                         nickPhrase = ( npcName and npcName.Name or nickPhrase )
                         if nickPhrase and nickPhrase != nickName then NPCVC.CachedNamePhrases[ nickName ] = nickPhrase end
                     else
@@ -208,11 +211,11 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 LastPlayPos = playPos,
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
-                AlphaRatio = ( canDrawRn and 1 or 0 ),
+                AlphaRatio = 0,
                 VolumeMult = volMult,
                 PlayTime = playTime,
-                LastPlayTime = ( canDrawRn and RealTime() or 0 ),
-                FirstDisplayTime = ( canDrawRn and RealTime() or 0 ),
+                LastPlayTime = 0,
+                FirstDisplayTime = 0,
                 IsHostile = ( vcData.EnemyPlayers[ LocalPlayer() ] or false )
             }
         end
@@ -307,13 +310,17 @@ local function UpdateSounds()
         if enabled then
             local lastPos = sndData.LastPlayPos
             if IsValid( srcEnt ) then
-                lastPos = srcEnt:GetPos()
-                sndData.LastPlayPos = lastPos
+                sndData.IsDormant = srcEnt:IsDormant()
                 
-                if srcEnt:IsRagdoll() then
-                    local leftC, rightC = snd:GetLevel()
-                    local voiceLvl = ( ( leftC + rightC ) / 2 )
-                    SetMouthFlexes( srcEnt, voiceLvl )
+                if !sndData.IsDormant then
+                    lastPos = srcEnt:GetPos()
+                    sndData.LastPlayPos = lastPos
+                    
+                    if srcEnt:IsRagdoll() then
+                        local leftC, rightC = snd:GetLevel()
+                        local voiceLvl = ( ( leftC + rightC ) / 2 )
+                        SetMouthFlexes( srcEnt, voiceLvl )
+                    end
                 end
             end
 
@@ -386,10 +393,12 @@ local function DrawVoiceChat()
     local fadeoutTime = vcPopupFadeTime:GetFloat()
     local displayDist = vcPopupDist:GetInt()
     displayDist = ( displayDist * displayDist )
+    
     local realTime = RealTime()
-
+    local timeOffset = 0
     local canDrawSomething = false
     table_Empty( drawPopupIndexes )
+
     for index, vcData in SortedPairsByMemberValue( NPCVC.VoicePopups, "FirstDisplayTime" ) do
         local playTime = vcData.PlayTime
         if playTime then
@@ -405,7 +414,7 @@ local function DrawVoiceChat()
         local lastPos = vcData.LastPlayPos
         if IsValid( ent ) then 
             local srcEnt = GetSoundSource( ent )
-            if IsValid( srcEnt ) then
+            if IsValid( srcEnt ) and !srcEnt:IsDormant() then
                 lastPos = srcEnt:GetPos()
                 vcData.LastPlayPos = lastPos
             end
@@ -413,6 +422,7 @@ local function DrawVoiceChat()
 
         local sndVol = 0
         local snd = vcData.Sound
+        local lastPlayTime = vcData.LastPlayTime
         if IsValid( snd ) and snd:GetState() == GMOD_CHANNEL_PLAYING then
             local leftChan, rightChan = snd:GetLevel()
             sndVol = ( ( leftChan + rightChan ) * 0.5 )
@@ -421,16 +431,14 @@ local function DrawVoiceChat()
                 vcData.LastPlayTime = realTime
 
                 if vcData.FirstDisplayTime == 0 then
-                    vcData.FirstDisplayTime = realTime
+                    vcData.FirstDisplayTime = ( realTime + timeOffset )
+                    timeOffset = ( timeOffset + 0.1 )
                 end 
             end
         end
         vcData.VoiceVolume = sndVol
 
         local drawAlpha = max( 0, 1 - ( ( realTime - vcData.LastPlayTime ) / fadeoutTime ) )
-        if IsValid( snd ) and drawAlpha != 0 then
-            drawAlpha = Lerp( 0.5, vcData.AlphaRatio, drawAlpha )
-        end
         if !IsValid( snd ) and drawAlpha == 0 then
             NPCVC.VoicePopups[ index ] = nil
             continue
@@ -462,6 +470,8 @@ local function DrawVoiceChat()
     local enemyPopupClrB = vcHostilePopupColorB:GetInt()
 
     local drawPfp = vcPopupDrawPfp:GetBool()
+    local popupIndex = 0
+    local shiftLeft = vcPopupShiftLeft:GetBool()
 
     for _, vcData in SortedPairsByMemberValue( drawPopupIndexes, "FirstDisplayTime" ) do
         local drawAlpha = vcData.AlphaRatio
@@ -485,15 +495,28 @@ local function DrawVoiceChat()
         end
 
         DrawText( vcData.Nick, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
-        drawY = ( drawY - 44 )
+
+        if shiftLeft and ( drawY - 44 ) < 0 then
+            drawX = ( drawX - 250 )
+            drawY = ( scrSizeH - 142 )
+        else
+            drawY = ( drawY - 44 )
+        end
+        popupIndex = ( popupIndex + 1 )
     end
 end
 
 local function OnCreateClientsideRagdoll( owner, ragdoll )
-    SimpleTimer( 0.1, function()
-        if !IsValid( owner ) or !IsValid( ragdoll ) then return end
-        sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
-        if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
+    if !IsValid( owner ) then return end
+    local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
+    local timerName = "npcsqueakers_fuckyounetworking" .. ragdoll:EntIndex()
+
+    CreateTimer( timerName, 0, 0, function()
+        if !IsValid( ragdoll ) or !IsValid( sndEmitter ) then RemoveTimer( timerName ) return end
+        if !sndEmitter.SetSoundSource then return end
+
+        sndEmitter:SetSoundSource( ragdoll )
+        RemoveTimer( timerName )
     end )
 end
 
@@ -1275,6 +1298,7 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, true, "CheckBox", "Scale Voice Icon", "cl_npcvoicechat_scaleicon", "If voice icons should scale with their owner's sizes" )
         AddSettingsPanel( panel, true, "CheckBox", "Display Voice Popups", "cl_npcvoicechat_showpopups", "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
         AddSettingsPanel( panel, true, "CheckBox", "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp", "If the NPC's voice popup should draw its profile picture" )
+        AddSettingsPanel( panel, true, "CheckBox", "Shift Popup To Left If Offscreen", "cl_npcvoicechat_popupshiftleft", "If the NPC's voice popup should shift to the left if it's being drawn offscreen due to lots of other" )
 
         AddSettingsPanel( panel, true, "NumSlider", "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range", {
             max = 2000
@@ -1350,6 +1374,8 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
         AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
         AddSettingsPanel( panel, false, "CheckBox", "Use NPC's Model Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon.\nNOTE: If the NPC was spawned before, you need to update the data for it's pfp to change" )
+        AddSettingsPanel( panel, false, "CheckBox", "Ignore PVS", "sv_npcvoicechat_ignorepvs", "If NPCs that are currently not processed in the client realm should still be able to use the voice chat." )
+        AddSettingsPanel( panel, false, "CheckBox", "No Idle Lines Outside PVS", "sv_npcvoicechat_ignorepvs_noidle", "If enabled, the 'Ignore PVS' setting will not affect the idle voicelines." )
 
         AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance should be when spawning", {
             max = 100

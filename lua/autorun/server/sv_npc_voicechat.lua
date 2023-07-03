@@ -215,6 +215,7 @@ local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", 
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
+local vcAllowGMDoom             = CreateConVar( "sv_npcvoicechat_allowgmdoom", "1", cvarFlag, "If NPCs from the GMDoom addon are allowed to use voicechat", 0, 1 )
 local vcUseModelIcon            = CreateConVar( "sv_npcvoicechat_usemodelicons", "0", cvarFlag, "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their spawnmenu icons", 0, 1 )
 local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", "0", cvarFlag, "If NPCs are only allowed to use profile pictures that are placed by players", 0, 1 )
@@ -438,11 +439,12 @@ local function GetVoiceLine( ent, voiceType )
 end
 
 function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
-    if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" or NPCVC.NPCBlacklist[ npc:GetClass() ] then return end
+    if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" then return end
     if voiceType != "laugh" and NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
+    if npc.IsDoomNPC and !vcAllowGMDoom:GetBool() then return end
     if npc.IsDrGNextbot and ( npc:IsPossessed() or !vcAllowDrGBase:GetBool() ) then return end
     if npc.IsVJBaseSNPC then
         if npc.VJ_IsBeingControlled or npc:GetState() != 0 or !vcAllowVJBase:GetBool() then return end
@@ -450,6 +452,9 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         return 
     end
     if !ignoreGagTypes[ voiceType ] and vcIgnoreGagged:GetBool() and npc:HasSpawnFlags( SF_NPC_GAG ) then return end
+
+    local class = npc:GetClass()
+    if NPCVC.NPCBlacklist[ class ] then return end
 
     local oldEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     if !NPCVC.TalkingNPCs[ oldEmitter ] and ( voiceType != "death" or !vcLimitAffectsDeath:GetBool() ) then
@@ -471,6 +476,7 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     sndEmitter:SetPos( npc:GetPos() )
     sndEmitter:SetOwner( npc )
     sndEmitter.DontRemoveEntity = dontDeleteOnRemove
+    sndEmitter.VoiceType = voiceType
     sndEmitter:Spawn()
 
     local enemyPlyData = npc.NPCVC_EnemyPlayers
@@ -492,7 +498,10 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         Nickname = npc.NPCVC_Nickname,
         UsesRealName = npc.NPCVC_UsesRealName,
         ProfilePicture = npc.NPCVC_ProfilePicture,
-        EnemyPlayers = enemyPlyData
+        EnemyPlayers = enemyPlyData,
+        StartPos = npc:GetPos(),
+        IsDormant = npc:IsDormant(),
+        Classname = class
     }
 
     SimpleTimer( ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 ), function()
@@ -654,7 +663,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     local assistLines = vcAllowLines_Assist:GetBool()
 
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
-        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or random( 1, 100 ) > npc.NPCVC_SpeechChance or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 3 ) != 1 and NPCVC:IsCurrentlySpeaking( npc ) ) then continue end
+        if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 4 ) != 1 and NPCVC:IsCurrentlySpeaking( npc ) ) then continue end
 
         local locAttacker = attacker
         if npc:GetClass() == "reckless_kleiner" and attacker == npc:GetParent() then
@@ -662,11 +671,11 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if locAttacker == npc then
-            if killLines and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) then
+            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and IsSinglePlayer() ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) then
                 NPCVC:PlayVoiceLine( npc, ( random( 1, 5 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
-        elseif attackPos and random( 1, 2 ) != 1 then
+        elseif attackPos and random( 1, 2 ) != 1 and random( 1, 100 ) <= npc.NPCVC_SpeechChance then
             if ( locAttacker == ent or locAttacker:IsWorld() or NPCVC:GetDispositionOfNPC( locAttacker, ent ) == D_LI ) and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then
                 NPCVC:PlayVoiceLine( npc, "laugh" )
                 continue
@@ -736,7 +745,8 @@ local function OnEntityCreated( npc )
             npc.NPCVC_VoiceIconHeight = 138
             npc.NPCVC_VoiceVolumeScale = 2
         else
-            local height = ( npcIconHeights[ npcClass ] or ( npc:OBBMaxs().z + 10 )  )
+            local scale = npc:GetModelScale()
+            local height = ( npcIconHeights[ npcClass ] or ( ( npc:OBBMaxs().z + 10 ) * scale )  )
             local isTwo = istable( height )
 
             npc.NPCVC_VoiceIconHeight = ( isTwo and height[ 2 ] or height )
@@ -744,8 +754,9 @@ local function OnEntityCreated( npc )
 
             if !isTwo then
                 local mins, maxs = npc:GetModelRenderBounds()
+
                 if !mins:IsZero() or !maxs:IsZero() then
-                    local height = ( abs( mins.z ) + maxs.z )
+                    local height = ( ( abs( mins.z ) + maxs.z ) * scale )
                     npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
                     npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
                 else
@@ -754,12 +765,13 @@ local function OnEntityCreated( npc )
                     net.Broadcast()
 
                     net.Receive( "npcsqueakers_sendrenderbounds", function()
-                        if !IsValid( npc ) then return end
-                        local mins, maxs = net.ReadVector(), net.ReadVector()
-                        local height = ( abs( mins.z ) + maxs.z )
+                        if IsValid( npc ) then
+                            local mins, maxs = net.ReadVector(), net.ReadVector()
+                            local height = ( ( abs( mins.z ) + maxs.z ) * scale )
 
-                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
-                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
+                            npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
+                            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
+                        end
                     end )
                 end
             end
@@ -830,8 +842,8 @@ local function OnEntityCreated( npc )
 
             function npc:PlaySoundSystem( sdSet, customSd, sdType )
                 if sdSet == "OnDangerSight" or sdSet == "OnGrenadeSight" then
-                    if vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
-                        NPCVC:PlayVoiceLine( npc, "witness" or "panic" )
+                    if vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                        NPCVC:PlayVoiceLine( npc, "panic" )
                     end
                 elseif random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
                     if sdSet == "MedicReceiveHeal" and vcAllowLines_Assist:GetBool() then
@@ -896,9 +908,18 @@ local function OnServerThink()
     for _, npc in ipairs( ents_GetAll() ) do
         if !IsValid( npc ) or !npc.NPCVC_Initialized then continue end
         
+        if npc.IsDoomNPC then 
+            if npc:Health() <= 0 then 
+                if !npc.NPCVC_IsKilled then OnNPCKilled( npc, nil, nil ) end
+                continue
+            elseif npc.NPCVC_IsKilled then
+                npc.NPCVC_IsKilled = false
+            end
+        end
+
         local npcClass = npc:GetClass()
         if npcClass == "monster_leech" and npc:GetInternalVariable( "m_takedamage" ) == 0 then
-            return
+            continue
         end
 
         if npcClass == "npc_turret_floor" then 
@@ -948,8 +969,7 @@ local function OnServerThink()
             local curState = npc:GetInternalVariable( "m_State" )
 
             if npc:GetInternalVariable( "m_takedamage" ) == 0 then
-                if npc.NPCVC_LastState != -1 then
-                    npc.NPCVC_LastState = -1
+                if !npc.NPCVC_IsKilled then
                     OnNPCKilled( npc, nil, nil )
                 end
             else
@@ -1131,7 +1151,7 @@ local function OnServerThink()
                         if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and isNPC and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
                             NPCVC:PlayVoiceLine( npc, "panic" )
                             npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
-                        elseif isNPC and !npc.IsVJBaseSNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
+                        elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
                             if rolledSpeech then

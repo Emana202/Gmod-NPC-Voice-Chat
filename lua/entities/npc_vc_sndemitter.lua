@@ -3,6 +3,9 @@ AddCSLuaFile()
 ENT.Base = "base_anim"
 ENT.Type = "anim"
 
+local vcIgnorePVS = CreateConVar( "sv_npcvoicechat_ignorepvs", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "If NPCs that are currently not processed in the client realm should still be able to use the voice chat.", 0, 1 )
+local vcPVSNoIdle = CreateConVar( "sv_npcvoicechat_ignorepvs_noidle", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "If enabled, the 'Ignore PVS' setting will not affect idle voicelines.", 0, 1 )
+
 function ENT:SetupDataTables()
 	self:NetworkVar( "Entity", 0, "SoundSource" )
     self:NetworkVar( "Bool", 0, "RemoveOnNoSource" )
@@ -40,6 +43,10 @@ if ( SERVER ) then
             local mins, maxs = owner:GetCollisionBounds()
             self:SetCollisionBounds( mins, maxs )
         end
+    end
+
+    function ENT:UpdateTransmitState()
+        return ( ( vcIgnorePVS:GetBool() and ( self.VoiceType != "idle" or !vcPVSNoIdle:GetBool() ) ) and TRANSMIT_ALWAYS or TRANSMIT_PVS )
     end
 
     function ENT:Think()
