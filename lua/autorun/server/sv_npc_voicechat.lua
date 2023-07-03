@@ -720,7 +720,6 @@ local function OnEntityCreated( npc )
         
         npc.NPCVC_LastSeenEnemyTime = 0
         npc.NPCVC_NextIdleSpeak = ( CurTime() + random( 0, 15 ) )
-        npc.NPCVC_NextDangerSoundTime = 0
         if npc.NPCVC_Initialized then return end
 
         local npcClass = npc:GetClass()
@@ -758,7 +757,7 @@ local function OnEntityCreated( npc )
                 if !mins:IsZero() or !maxs:IsZero() then
                     local height = ( ( abs( mins.z ) + maxs.z ) * scale )
                     npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
-                    npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
+                    npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 4.25 )
                 else
                     net.Start( "npcsqueakers_getrenderbounds" )
                         net.WriteEntity( npc )
@@ -1148,9 +1147,8 @@ local function OnServerThink()
                             end
                         end
 
-                        if !npc.IsVJBaseSNPC and curTime >= npc.NPCVC_NextDangerSoundTime and vcAllowLines_SpotDanger:GetBool() and isNPC and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
+                        if isNPC and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
                             NPCVC:PlayVoiceLine( npc, "panic" )
-                            npc.NPCVC_NextDangerSoundTime = ( curTime + 5 )
                         elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
