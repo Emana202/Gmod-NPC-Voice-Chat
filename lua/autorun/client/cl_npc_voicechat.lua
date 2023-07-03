@@ -1404,8 +1404,8 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death", "sv_npcvoicechat_speaklimit_dontaffectdeath", "If the speak limit shouldn't affect NPCs that are playing their death voiceline" )
 
         AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "If NPC's speech chance should also affect its playing of death voicelines." ) 
-
         AddSettingsPanel( panel, false, "CheckBox", "Save Voice Data Of Essential NPCs", "sv_npcvoicechat_savenpcdataonmapchange", "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when sometimes appearing and etc.\nRecommended to turn off when not playing any campaign!" ) 
+        AddSettingsPanel( panel, false, "CheckBox", "Use Sound Hints For Detecting Dangers", "sv_npcvoicechat_usesoundhintsforspottingdanger", "If enabled, NPCs will use the sound hint system to detect dangers. Ex. This will allow for nextbots and non-intelligent NPCs to panic for being near a HL2 grenade and etc." ) 
 
         if LambdaVoiceProfiles then
             panel:Help( "Lambda-Related Stuff:" )

@@ -28,6 +28,7 @@ local CurTime = CurTime
 local Material = Material
 local Color = Color
 local GetScheduleID = ai.GetScheduleID
+local GetLoudestSoundHint = sound.GetLoudestSoundHint
 local ents_Create = ents.Create
 local table_GetKeys = table.GetKeys
 local table_insert = table.insert
@@ -229,6 +230,7 @@ local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dont
 local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance should be when spawning", 0, 100 )
 local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
+local vcUseSoundHintsForDangers = CreateConVar( "sv_npcvoicechat_usesoundhintsforspottingdanger", "1", cvarFlag, "If enabled, NPCs will use the sound hint system to detect dangers. Ex. This will allow for all NPCs to panic on being near a grenade and etc.", 0, 1 )
 
 local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicelines", "0", cvarFlag, "If NPCs should use voicelines from Lambda Players and its addons + modules instead" )
 local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
@@ -1147,7 +1149,19 @@ local function OnServerThink()
                             end
                         end
 
-                        if isNPC and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) then
+                        local isNearDanger = ( isNPC and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) )
+                        if !isNearDanger and vcUseSoundHintsForDangers:GetBool() then
+                            local npcPos = npc:GetPos()
+                            local hintDang = ( GetLoudestSoundHint( SOUND_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_PHYSICS_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_CONTEXT_DANGER_APPROACH, npcPos ) )
+
+                            if hintDang then
+                                PrintTable( hintDang )
+                                local hintOwner = hintDang.owner
+                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) or hintOwner != npc and hintOwner:GetClass() != npcClass ) )
+                            end
+                        end
+
+                        if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
                             NPCVC:PlayVoiceLine( npc, "panic" )
                         elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
