@@ -1366,6 +1366,7 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
         if sbNextbotsInstalled then AddSettingsPanel( panel, false, "CheckBox", "SB Advanced Nextbots", "sv_npcvoicechat_allowsbnextbots" ) end
         if TF2AIHats and TF2AIWeapons then AddSettingsPanel( panel, false, "CheckBox", "Team Fortress 2 Bots", "sv_npcvoicechat_allowtf2bots" ) end
+        if DOOM then AddSettingsPanel( panel, false, "CheckBox", "GMDoom Demons", "sv_npcvoicechat_allowgmdoom" ) end
         panel:Help( "------------------------------------------------------------" )
 
         AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregaggednpcs", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
