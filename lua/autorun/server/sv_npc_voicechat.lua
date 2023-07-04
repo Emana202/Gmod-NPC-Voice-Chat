@@ -1155,7 +1155,6 @@ local function OnServerThink()
                             local hintDang = ( GetLoudestSoundHint( SOUND_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_PHYSICS_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_CONTEXT_DANGER_APPROACH, npcPos ) )
 
                             if hintDang then
-                                PrintTable( hintDang )
                                 local hintOwner = hintDang.owner
                                 isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) or hintOwner != npc and hintOwner:GetClass() != npcClass ) )
                             end
