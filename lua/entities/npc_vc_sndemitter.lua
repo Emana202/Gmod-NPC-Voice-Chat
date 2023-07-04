@@ -46,7 +46,8 @@ if ( SERVER ) then
     end
 
     function ENT:UpdateTransmitState()
-        return ( ( vcIgnorePVS:GetBool() and ( self.VoiceType != "idle" or !vcPVSNoIdle:GetBool() ) ) and TRANSMIT_ALWAYS or TRANSMIT_PVS )
+        local vt = self.VoiceType
+        return ( ( vcIgnorePVS:GetBool() and ( vt != "idle" and vt != "taunt" or !vcPVSNoIdle:GetBool() ) ) and TRANSMIT_ALWAYS or TRANSMIT_PVS )
     end
 
     function ENT:Think()
