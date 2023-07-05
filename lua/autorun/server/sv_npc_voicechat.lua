@@ -683,23 +683,19 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 continue
             end
 
-            if assistLines and !NPCVC:IsCurrentlySpeaking( npc, "assist" ) and NPCVC:GetDispositionOfNPC( npc, locAttacker ) != D_HT and attackPos:DistToSqr( npc:GetPos() ) <= 1000000 then
-                local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
-                if !isEnemy and npc:IsNPC() then
-                    for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
-                        isEnemy = ( knownEne == ent )
-                        if isEnemy then break end
-                    end
-                end
-                if isEnemy then
-                    NPCVC:PlayVoiceLine( npc, "assist" )
-                    continue
+            local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
+            if !isEnemy and npc:IsNPC() then
+                for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
+                    isEnemy = ( knownEne == ent )
+                    if isEnemy then break end
                 end
             end
-
-            local entDisp = NPCVC:GetDispositionOfNPC( npc, ent )
-            if entDisp >= 3 and entPos:DistToSqr( npc:GetPos() ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
-                NPCVC:PlayVoiceLine( npc, ( random( 1, 3 ) == 1 and "panic" or "witness" ) )
+            if isEnemy and assistLines and !NPCVC:IsCurrentlySpeaking( npc, "assist" ) and NPCVC:GetDispositionOfNPC( npc, locAttacker ) != D_HT and attackPos:DistToSqr( npc:GetPos() ) <= 1000000 then
+                NPCVC:PlayVoiceLine( npc, "assist" )
+                continue
+            end
+            if ( isEnemy or NPCVC:GetDispositionOfNPC( npc, ent ) >= 3 ) and entPos:DistToSqr( npc:GetPos() ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
+                NPCVC:PlayVoiceLine( npc, ( ( !isEnemy and random( 1, 3 ) == 1 ) and "panic" or "witness" ) )
                 continue
             end
         end
@@ -747,6 +743,7 @@ local function OnEntityCreated( npc )
             npc.NPCVC_VoiceVolumeScale = 2
         else
             local scale = npc:GetModelScale()
+            if !scale then scale = 1.0 end
             local height = ( npcIconHeights[ npcClass ] or ( ( npc:OBBMaxs().z + 10 ) * scale )  )
             local isTwo = istable( height )
 
@@ -1156,7 +1153,7 @@ local function OnServerThink()
 
                             if hintDang then
                                 local hintOwner = hintDang.owner
-                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) or hintOwner != npc and hintOwner:GetClass() != npcClass ) )
+                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or hintOwner != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
                             end
                         end
 
@@ -1218,7 +1215,12 @@ local function OnServerThink()
             npc.NPCVC_LastEnemy = curEnemy
             if IsValid( curEnemy ) then 
                 npc.NPCVC_LastValidEnemy = curEnemy
-                if npc:Visible( curEnemy ) then npc.NPCVC_LastSeenEnemyTime = curTime end
+                
+                if npc.NPCVC_LastSeenEnemyTime == 0 or npc:Visible( curEnemy ) then 
+                    npc.NPCVC_LastSeenEnemyTime = curTime 
+                end
+            else
+                npc.NPCVC_LastSeenEnemyTime = 0
             end
         end
 
