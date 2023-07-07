@@ -231,7 +231,8 @@ net.Receive( "npcsqueakers_getrenderbounds", function()
     local ent = net.ReadEntity()
     if !IsValid( ent ) then return end
 
-    local _, curHeight = ent:GetRenderBounds()
+    local curFeet, curHeight = ent:GetRenderBounds()
+    if !curFeet and !curHeight then return end
     curHeight = curHeight.z
 
     local timerName = "npcsqueakers_adjustbounds" .. ent:EntIndex() .. CurTime()

@@ -753,7 +753,7 @@ local function OnEntityCreated( npc )
             if !isTwo then
                 local mins, maxs = npc:GetModelRenderBounds()
 
-                if !mins:IsZero() or !maxs:IsZero() then
+                if mins and maxs and ( !mins:IsZero() or !maxs:IsZero() ) then
                     local height = ( ( abs( mins.z ) + maxs.z ) * scale )
                     npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
                     npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 4.25 )
@@ -1153,7 +1153,7 @@ local function OnServerThink()
 
                             if hintDang then
                                 local hintOwner = hintDang.owner
-                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or hintOwner != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
+                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or IsValid( hintOwner ) and hintOwner != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
                             end
                         end
 
