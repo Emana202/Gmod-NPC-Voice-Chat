@@ -275,7 +275,7 @@ local function AddVoiceProfile( path )
             if voiceType == "fall" then typeName = "panic" end
 
             NPCVC.VoiceProfiles[ voicePfp ] = ( NPCVC.VoiceProfiles[ voicePfp ] or {} )
-            NPCVC.VoiceProfiles[ voicePfp ][ typeName ] = {}
+            NPCVC.VoiceProfiles[ voicePfp ][ typeName ] = ( NPCVC.VoiceProfiles[ voicePfp ][ typeName ] or {} )
 
             for _, voiceline in ipairs( voicelines ) do
                 table_insert( NPCVC.VoiceProfiles[ voicePfp ][ typeName ], voiceTypePath .. "/" .. voiceline )
@@ -754,22 +754,23 @@ local function OnEntityCreated( npc )
                 local mins, maxs = npc:GetModelRenderBounds()
 
                 if mins and maxs and ( !mins:IsZero() or !maxs:IsZero() ) then
-                    local height = ( ( abs( mins.z ) + maxs.z ) * scale )
-                    npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
-                    npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 4.25 )
+                    local mdlHeight = ( ( abs( mins.z ) + maxs.z ) * scale )
+                    if mdlHeight > height then
+                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
+                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 4.25 )
+                    end
                 else
                     net.Start( "npcsqueakers_getrenderbounds" )
                         net.WriteEntity( npc )
                     net.Broadcast()
 
                     net.Receive( "npcsqueakers_sendrenderbounds", function()
-                        if IsValid( npc ) then
-                            local mins, maxs = net.ReadVector(), net.ReadVector()
-                            local height = ( ( abs( mins.z ) + maxs.z ) * scale )
+                        local mins, maxs = net.ReadVector(), net.ReadVector()
+                        local mdlHeight = ( ( abs( mins.z ) + maxs.z ) * scale )
+                        if mdlHeight <= height or !IsValid( npc ) then return end
 
-                            npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( height + 10 ) )
-                            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( height ) / 72 ), 0.66, 3.33 )
-                        end
+                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
+                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 3.33 )
                     end )
                 end
             end
