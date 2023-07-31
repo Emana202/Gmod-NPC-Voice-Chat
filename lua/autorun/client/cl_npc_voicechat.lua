@@ -34,8 +34,9 @@ local ScrH = ScrH
 local Start3D2D = cam.Start3D2D
 local surface_SetDrawColor = surface.SetDrawColor
 local surface_SetMaterial = surface.SetMaterial
-local surface_DrawRect = surface.DrawRect
 local surface_DrawTexturedRect = surface.DrawTexturedRect
+local surface_SetFont = surface.SetFont
+local surface_GetTextSize = surface.GetTextSize
 local End3D2D = cam.End3D2D
 local CreateTimer = timer.Create
 local RemoveTimer = timer.Remove
@@ -195,9 +196,6 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                     end
                 end
                 nickName = nickPhrase
-            end
-            if #nickName > 23 then 
-                nickName = string_sub( nickName, 0, 22 ) .. "..." 
             end
 
             local displayDist = vcPopupDist:GetInt()
@@ -474,6 +472,8 @@ local function DrawVoiceChat()
     local popupIndex = 0
     local shiftLeft = vcPopupShiftLeft:GetBool()
 
+    surface_SetFont( "GModNotify" )
+
     for _, vcData in SortedPairsByMemberValue( drawPopupIndexes, "FirstDisplayTime" ) do
         local drawAlpha = vcData.AlphaRatio
         popup_BaseClr.a = ( drawAlpha * 255 )
@@ -495,7 +495,10 @@ local function DrawVoiceChat()
             end
         end
 
-        DrawText( vcData.Nick, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
+        local nickname = vcData.Nick
+        local textWidth = surface_GetTextSize( nickname )
+        if textWidth > 202 then nickname = string_sub( nickname, 0, 28 * ( 202 / textWidth ) ) .. "..." end
+        DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
 
         if shiftLeft and ( drawY - 44 ) < 0 then
             drawX = ( drawX - 250 )
