@@ -497,7 +497,7 @@ local function DrawVoiceChat()
 
         local nickname = vcData.Nick
         local textWidth = surface_GetTextSize( nickname )
-        if textWidth > 202 then nickname = string_sub( nickname, 0, 28 * ( 202 / textWidth ) ) .. "..." end
+        if textWidth > 190 then nickname = string_sub( nickname, 0, 28 * ( 190 / textWidth ) ) .. "..." end
         DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
 
         if shiftLeft and ( drawY - 44 ) < 0 then

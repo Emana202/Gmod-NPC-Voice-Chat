@@ -571,75 +571,102 @@ function NPCVC:GetDispositionOfNPC( npc, target )
     return ( dispFunc and dispFunc( npc, target ) or ( target:GetClass() == npc:GetClass() and D_LI or D_HT ) )
 end
 
+function NPCVC:GetNPCRealName( npc )
+    local npcName = npc.NPCName
+
+    if !npcName then
+        local class = npc:GetClass()
+        if class == "npc_citizen" then
+            if npc:GetModel() == "models/odessa.mdl" then 
+                return "npc_odessa"
+            elseif npc:HasSpawnFlags( 131072 ) then
+                return "Medic"
+            else
+                local citType = npc:GetInternalVariable( "citizentype" )
+                if citType == 2 then
+                    return "Refugee"
+                elseif citType == 3 then
+                    return "Rebel"
+                end
+            end
+        elseif class == "npc_combine_s" then
+            local mdl = npc:GetModel()
+            if mdl == "models/combine_soldier_prisonguard.mdl" then 
+                return ( npc:GetSkin() == 1 and "PrisonShotgunner" or "CombinePrison" )
+            elseif mdl == "models/combine_super_soldier.mdl" then
+                return "CombineElite"
+            elseif mdl == "models/combine_soldier.mdl" and npc:GetSkin() == 1 then
+                return "ShotgunSoldier"
+            end
+        elseif class == "npc_vortigaunt" then
+            local mdl = npc:GetModel()
+            if mdl == "models/vortigaunt_doctor.mdl" then
+                return "VortigauntUriah"
+            elseif mdl == "models/vortigaunt_slave.mdl" then
+                return "VortigauntSlave"
+            end
+        elseif class == "npc_antlionguard" and npc:GetSkin() == 1 then
+            return "npc_antlionguardian"
+        end
+    end
+
+    return npcName
+end
+
+local function GetNPCSpawnIcon( npc, class )
+    local iconName, iconMat
+    local npcName = NPCVC:GetNPCRealName( npc )
+    if npcName and class != npcName then
+        iconName, iconMat = GetNPCSpawnIcon( npc, npcName )
+        if !iconMat:IsError() then return iconName, iconMat end
+    end
+
+    iconName = "entities/" .. class .. ".png"
+    iconMat = Material( iconName )
+
+    if iconMat:IsError() then
+        iconName = "entities/" .. class .. ".jpg"
+        iconMat = Material( iconName )
+
+        if iconMat:IsError() then
+            iconName = "vgui/entities/" .. class
+            iconMat = Material( iconName )
+        end
+    end
+
+    return iconName, iconMat
+end
+
 local function GetNPCProfilePicture( npc )
     if vcUseCustomPfps:GetBool() then
         if vcUseLambdaPfpPics:GetBool() and #Lambdaprofilepictures != 0 then
             return Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
         else
-            local pfpPics = NPCVC.ProfilePictures
-            local userPfps = NPCVC.UserPFPs
+            local userPfps, pfpPics = NPCVC.UserPFPs
             if #userPfps != 0 then
-                if vcUserPfpsOnly:GetBool() then
-                    pfpPics = userPfps
-                else
-                    pfpPics = table_Merge( pfpPics, userPfps )
-                end
+                pfpPics = ( vcUserPfpsOnly:GetBool() and userPfps or table_Merge( pfpPics, userPfps ) )
+            else
+                pfpPics = NPCVC.ProfilePictures
             end
-            if #pfpPics != 0 then return pfpPics[ random( #pfpPics ) ] end
+
+            if #pfpPics != 0 then 
+                return pfpPics[ random( #pfpPics ) ] 
+            end
         end
     end
 
-    local npcClass = npc:GetClass()
-    local npcModel = npc:GetModel()
-
-    local cacheType = npcModel
-    local profilePic = NPCVC.CachedNPCPfps[ cacheType ]
+    local npcName, npcClass, npcModel = NPCVC:GetNPCRealName( npc ), npc:GetClass(), npc:GetModel()
+    local cacheType, profilePic = npcModel, NPCVC.CachedNPCPfps[ cacheType ]
     if !profilePic then
-        cacheType = npcClass
+        cacheType = ( npcName or npcClass )
         profilePic = NPCVC.CachedNPCPfps[ cacheType ]
     end
 
     if profilePic == nil or profilePic != false then
-        -- Least deranged man's code
-        local iconName, iconMat
-        if vcUseModelIcon:GetBool() then 
-            if npcModel and #npcModel != 0 then
-                iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
-                iconMat = Material( iconName )
-            end
-
-            if iconMat:IsError() then
-                iconName = "entities/" .. npcClass .. ".png"
-                iconMat = Material( iconName )
-
-                if iconMat:IsError() then
-                    iconName = "entities/" .. npcClass .. ".jpg"
-                    iconMat = Material( iconName )
-
-                    if iconMat:IsError() then
-                        iconName = "vgui/entities/" .. npcClass
-                        iconMat = Material( iconName )
-                    end
-                end
-            end
-        else
-            iconName = "entities/" .. npcClass .. ".png"
+        local iconName, iconMat = GetNPCSpawnIcon( npc, npcClass )
+        if npcModel and #npcModel != 0 and ( vcUseModelIcon:GetBool() or iconMat:IsError() ) then
+            iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
             iconMat = Material( iconName )
-
-            if iconMat:IsError() then
-                iconName = "entities/" .. npcClass .. ".jpg"
-                iconMat = Material( iconName )
-
-                if iconMat:IsError() then
-                    iconName = "vgui/entities/" .. npcClass
-                    iconMat = Material( iconName )
-
-                    if npcModel and #npcModel != 0 and iconMat:IsError() then
-                        iconName = "spawnicons/".. string_sub( npcModel, 1, #npcModel - 4 ).. ".png"
-                        iconMat = Material( iconName )
-                    end
-                end
-            end
         end
 
         if !iconMat:IsError() then
@@ -785,7 +812,23 @@ local function OnEntityCreated( npc )
             
             local nickName
             if vcUseRealNames:GetBool() then
-                nickName = "#" .. npcClass
+                local gmName = GAMEMODE.GetDeathNoticeEntityName
+                local locName = "#" .. npcClass
+
+                if gmName then
+                    nickName = gmName( GAMEMODE, npc )
+
+                    if nickName == locName then
+                        local realName = NPCVC:GetNPCRealName( npc )
+                        if npc.NPCName != realName then 
+                            local listName = list.Get( "NPC" )[ realName ]
+                            if listName then nickName = listName.Name end
+                        end
+                    end
+                else
+                    nickName = locName
+                end
+
                 npc.NPCVC_UsesRealName = true
             else
                 nickName = GetAvailableNickname()
