@@ -102,7 +102,8 @@ local nonNPCNPCs = {
     [ "monster_furniture" ] = true,
     [ "animprop_generic" ] = true,
     [ "animprop_generic_physmodel" ] = true,
-    [ "monster_generic" ] = true
+    [ "monster_generic" ] = true,
+    [ "rd_target" ] = true
 }
 local drownNPCs = {
     [ "npc_headcrab" ] = true,
