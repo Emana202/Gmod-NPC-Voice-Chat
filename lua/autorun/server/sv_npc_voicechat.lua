@@ -444,6 +444,7 @@ end
 function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" then return end
     if voiceType != "laugh" and NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then return end
+    if npc.l_TranqGun_IsTranquilized and voiceType != "death" then return end
     if npc.LastPathingInfraction and !vcAllowSanics:GetBool() then return end
     if npc.SBAdvancedNextBot and !vcAllowSBNextbots:GetBool() then return end
     if npc.MNG_TF2Bot and !vcAllowTF2Bots:GetBool() then return end
@@ -949,8 +950,8 @@ local function OnServerThink()
     if aiDisabled:GetBool() then return end
 
     for _, npc in ipairs( ents_GetAll() ) do
-        if !IsValid( npc ) or !npc.NPCVC_Initialized then continue end
-        
+        if !IsValid( npc ) or !npc.NPCVC_Initialized or npc.l_TranqGun_IsTranquilized then continue end
+
         if npc.IsDoomNPC then 
             if npc:Health() <= 0 then 
                 if !npc.NPCVC_IsKilled then OnNPCKilled( npc, nil, nil ) end
