@@ -20,6 +20,7 @@ local EyePos = EyePos
 local table_remove = table.remove
 local table_HasValue = table.HasValue
 local table_Merge = table.Merge
+local table_Count = table.Count
 local table_RemoveByValue = table.RemoveByValue
 local max = math.max
 local GetConVar = GetConVar
@@ -47,6 +48,8 @@ local PlaySound = surface.PlaySound
 local notification_AddLegacy = notification.AddLegacy
 local vgui_Create = vgui.Create
 local list_Get = list.Get
+
+local lambdaPopupX, lambdaPopupY
 
 local voiceIconMat      = Material( "voice/icntlk_pl" )
 local popup_BaseClr     = Color( 255, 255, 255, 255 )
@@ -459,6 +462,15 @@ local function DrawVoiceChat()
     local plyPopups = g_VoicePanelList
     if ispanel( plyPopups ) then drawY = ( drawY - ( 44 * #plyPopups:GetChildren() ) ) end
 
+    local lambdaPopups = _LAMBDAPLAYERS_VoicePopups
+    if lambdaPopups then
+        lambdaPopupX = ( lambdaPopupX or GetConVar( "lambdaplayers_voice_voicepopupoffset_x" ) )
+        drawY = ( drawY + lambdaPopupX:GetInt() ) 
+
+        lambdaPopupY = ( lambdaPopupY or GetConVar( "lambdaplayers_voice_voicepopupoffset_y" ) )
+        drawY = ( drawY - ( 44 * table_Count( lambdaPopups ) ) + lambdaPopupY:GetInt() ) 
+    end
+
     local popupClrR = vcPopupColorR:GetInt()
     local popupClrG = vcPopupColorG:GetInt()
     local popupClrB = vcPopupColorB:GetInt()
@@ -497,7 +509,9 @@ local function DrawVoiceChat()
 
         local nickname = vcData.Nick
         local textWidth = surface_GetTextSize( nickname )
-        if textWidth > 190 then nickname = string_sub( nickname, 0, 28 * ( 190 / textWidth ) ) .. "..." end
+        if textWidth > 200 then
+            nickname = sub( nickname, 0, ( ( #nickname * ( 202.5 / textWidth ) ) - 3 ) ) .. "..."
+        end
         DrawText( nickname, "GModNotify", drawX + 43.5, drawY + 9, popup_BaseClr, TEXT_ALIGN_LEFT )
 
         if shiftLeft and ( drawY - 44 ) < 0 then
@@ -528,7 +542,7 @@ hook.Add( "Tick", "NPCSqueakers_UpdateSounds", UpdateSounds )
 hook.Add( "PreDrawEffects", "NPCSqueakers_DrawVoiceIcons", DrawVoiceIcons )
 hook.Add( "HUDPaint", "NPCSqueakers_DrawVoiceChat", DrawVoiceChat )
 hook.Add( "CreateClientsideRagdoll", "NPCSqueakers_OnCreateClientsideRagdoll", OnCreateClientsideRagdoll )
-
+hook.Add( "OnScreenSizeChanged", "NPCSqueakers_OnScreenSizeChanged", OnScreenSizeChanged )
 ------------------------------------------------------------------------------------------------------------
 
 NPCVC.ClientSettings    = NPCVC.ClientSettings or {}
