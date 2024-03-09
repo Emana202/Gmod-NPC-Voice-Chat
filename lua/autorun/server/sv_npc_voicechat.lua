@@ -224,11 +224,13 @@ local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", 
 local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregaggednpcs", "0", cvarFlag, "If NPCs that are gagged by the map or other means aren't allowed to play voicelines until ungagged", 0, 1 )
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
+local vcKillfeedNick            = CreateConVar( "sv_npcvoicechat_killfeednicks", "1", cvarFlag, "If NPC's killfeed name should be their voicechat nickname", 0, 1 )
 local vcPitchMin                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_min", "95", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_max", "105", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance should be when spawning", 0, 100 )
+local vcMaxSpeechChance         = CreateConVar( "sv_npcvoicechat_maximumspeechchance", "100", cvarFlag, "The maximum value the NPC's random speech chance should be when spawning", 0, 100 )
 local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
 local vcUseSoundHintsForDangers = CreateConVar( "sv_npcvoicechat_usesoundhintsforspottingdanger", "1", cvarFlag, "If enabled, NPCs will use the sound hint system to detect dangers. Ex. This will allow for all NPCs to panic on being near a grenade and etc.", 0, 1 )
@@ -263,13 +265,13 @@ local vcVoiceTypeDirs = {
 }
 
 local function AddVoiceProfile( path )
-    local _, voicePfpDirs = file_Find( "sound/" .. path .. "/*", "GAME" )
+    local _, voicePfpDirs = file_Find( "sound/" .. path .. "/*", "GAME", "nameasc" )
     if !voicePfpDirs then return end
     
     for _, voicePfp in ipairs( voicePfpDirs ) do
         for voiceType, _ in pairs( defVoiceTypeDirs ) do 
             local voiceTypePath = path .. "/" .. voicePfp .. "/" .. voiceType
-            local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME" )
+            local voicelines = file_Find( "sound/" .. voiceTypePath .. "/*", "GAME", "nameasc" )
             if !voicelines or #voicelines == 0 then continue end
 
             local typeName = voiceType
@@ -323,7 +325,7 @@ local function UpdateData( ply )
     table_Empty( NPCVC.VoiceLines )
     for voiceType, voiceDir in pairs( vcVoiceTypeDirs ) do
         local sndDir = voiceDir:GetString() .. "/"
-        local snds = file_Find( "sound/" .. sndDir .. "*", "GAME" )
+        local snds = file_Find( "sound/" .. sndDir .. "*", "GAME", "nameasc" )
         if !snds or #snds == 0 then continue end
 
         local lineTbl = {}
@@ -332,7 +334,7 @@ local function UpdateData( ply )
     end
 
     table_Empty( NPCVC.ProfilePictures )
-    local pfpPics = file_Find( "materials/npcvcdata/profilepics/*", "GAME" )
+    local pfpPics = file_Find( "materials/npcvcdata/profilepics/*", "GAME", "nameasc" )
     if pfpPics and #pfpPics > 0 then
         for _, pfpPic in ipairs( pfpPics ) do
             NPCVC.ProfilePictures[ #NPCVC.ProfilePictures + 1 ] = "npcvcdata/profilepics/" .. pfpPic
@@ -340,7 +342,7 @@ local function UpdateData( ply )
     end
 
     table_Empty( NPCVC.UserPFPs )
-    pfpPics = file_Find( "materials/npcvcdata/custompfps/*", "GAME" )
+    pfpPics = file_Find( "materials/npcvcdata/custompfps/*", "GAME", "nameasc" )
     if pfpPics and #pfpPics > 0 then
         for _, pfpPic in ipairs( pfpPics ) do
             NPCVC.UserPFPs[ #NPCVC.UserPFPs + 1 ] = "npcvcdata/custompfps/" .. pfpPic
@@ -806,7 +808,7 @@ local function OnEntityCreated( npc )
         end
 
         if !npc.NPCVC_IsDuplicated then
-            local speechChance = random( vcMinSpeechChance:GetInt(), 100 )
+            local speechChance = random( vcMinSpeechChance:GetInt(), vcMaxSpeechChance:GetInt() )
             npc.NPCVC_SpeechChance = speechChance
             
             local voicePitch = random( vcPitchMin:GetInt(), vcPitchMax:GetInt() )
@@ -1218,7 +1220,7 @@ local function OnServerThink()
                                         if vcAllowLines_CombatIdle:GetBool() then
                                             NPCVC:PlayVoiceLine( npc, combatLine )
                                         end
-                                    elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT ) and vcAllowLines_Idle:GetBool() then
+                                    elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT or curState == NPC_STATE_SCRIPT ) and vcAllowLines_Idle:GetBool() then
                                         NPCVC:PlayVoiceLine( npc, "idle" )
                                     end
                                 end
@@ -1344,6 +1346,21 @@ local function OnServerShutDown()
     end
 end
 
+local function OnMapInitialized()
+    UpdateData()
+
+    NPCVC.OldFunc_GetDeathNoticeEntityName = ( NPCVC.OldFunc_GetDeathNoticeEntityName or GAMEMODE.GetDeathNoticeEntityName )
+    if !NPCVC.OldFunc_GetDeathNoticeEntityName then return end
+    
+    function GAMEMODE:GetDeathNoticeEntityName( ent )
+        local origReturn = NPCVC.OldFunc_GetDeathNoticeEntityName( self, ent )
+        if vcKillfeedNick:GetBool() and !ent.NPCVC_UsesRealName then
+            return ( ent.NPCVC_Nickname or origReturn ) 
+        end
+        return origReturn
+    end
+end
+
 hook.Add( "OnEntityCreated", "NPCSqueakers_OnEntityCreated", OnEntityCreated )
 hook.Add( "EntityEmitSound", "NPCSqueakers_OnEntityEmitSound", OnEntityEmitSound )
 hook.Add( "PlayerSpawnedNPC", "NPCSqueakers_OnPlayerSpawnedNPC", OnPlayerSpawnedNPC )
@@ -1355,4 +1372,4 @@ hook.Add( "PostEntityTakeDamage", "NPCSqueakers_OnPostEntityTakeDamage", OnPostE
 hook.Add( "AcceptInput", "NPCSqueakers_OnAcceptInput", OnAcceptInput )
 hook.Add( "PropBreak", "NPCSqueakers_OnPropBreak", OnPropBreak )
 hook.Add( "ShutDown", "NPCSqueakers_OnServerShutDown", OnServerShutDown )
-hook.Add( "InitPostEntity", "NPCSqueakers_OnMapInitialized", UpdateData )
+hook.Add( "InitPostEntity", "NPCSqueakers_OnMapInitialized", OnMapInitialized )

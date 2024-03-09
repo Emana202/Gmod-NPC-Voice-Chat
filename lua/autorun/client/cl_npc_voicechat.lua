@@ -1390,15 +1390,25 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregaggednpcs", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
+        AddSettingsPanel( panel, false, "CheckBox", "Use Nicknames On Killfeed", "sv_npcvoicechat_killfeednicks", "If NPC's killfeed name should be their nickname instead")
         AddSettingsPanel( panel, false, "CheckBox", "Use Custom Profile Pictures", "sv_npcvoicechat_usecustompfps", "If NPCs are allowed to use custom profile pictures instead of their model's spawnmenu icon if any is available" )
         AddSettingsPanel( panel, false, "CheckBox", "Only User Profile Pictures", "sv_npcvoicechat_userpfpsonly", "If NPCs are only allowed to use user-placed profile pictures. If there are none of them, fallbacks to addon's profile pictures" )
         AddSettingsPanel( panel, false, "CheckBox", "Use NPC's Model Spawnicon", "sv_npcvoicechat_usemodelicons", "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon.\nNOTE: If the NPC was spawned before, you need to update the data for it's pfp to change" )
         AddSettingsPanel( panel, false, "CheckBox", "Ignore PVS", "sv_npcvoicechat_ignorepvs", "If NPCs that are currently not processed in the client realm should still be able to use the voice chat." )
         AddSettingsPanel( panel, false, "CheckBox", "No Idle Lines Outside PVS", "sv_npcvoicechat_ignorepvs_noidle", "If enabled, the 'Ignore PVS' setting will not affect the idle voicelines." )
 
-        AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance should be when spawning", {
+        local minSpeechChan = AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance should be when spawning", {
             max = 100
         } )
+        local maxSpeechChan = AddSettingsPanel( panel, false, "NumSlider", "Maximum Speech Chance", "sv_npcvoicechat_maximumspeechchance", "The maximum value the NPC's random speech chance should be when spawning", {
+            max = 100
+        } )
+        function minSpeechChan:OnValueChanged( value )
+            maxSpeechChan:SetMin( value )
+        end
+        function maxSpeechChan:OnValueChanged( value )
+            minSpeechChan:SetMax( value )
+        end
 
         local minPitch = AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
             min = 10,
@@ -1408,7 +1418,6 @@ local function PopulateToolMenu()
             min = 100,
             max = 255
         } )
-
         function minPitch:OnValueChanged( value )
             maxPitch:SetMin( value )
         end
