@@ -340,7 +340,7 @@ local function UpdateSounds()
                     snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
                 else
                     snd:Set3DEnabled( false )
-                    sndVol = Clamp( sndVol / ( curPos:DistToSqr( lastPos ) / ( fadeDist * fadeDist ) ), 0, 1 )
+                    sndVol = Clamp( sndVol - ( curPos:Distance( lastPos ) / ( fadeDist * 1.5 ) ), 0, 1 )
                 end
 
                 snd:SetVolume( sndVol )
