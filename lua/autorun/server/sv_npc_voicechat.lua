@@ -178,6 +178,62 @@ local ignoreGagTypes = {
     [ "witness" ] = true
 }
 
+--[[
+local specialMapData = {
+    [ "d1_trainstation_01" ] = {
+        [ "npc_breen" ] = {
+            Pos = {
+                Vector( -4063.904053, -2035.823364, 478.108734 ),
+                Vector( -3890.994629, -695.143372, 211.968521 ),
+            },
+            Volume = 2.25
+        },
+        [ "npc_kleiner" ] = {
+            Pos = Vector( -3274.656494, -292.627411, 56.341728 ),
+            Volume = 0.75
+        }
+    },
+    [ "d1_trainstation_02" ] = {
+        [ "npc_breen" ] = {
+            Pos = {
+                Vector( -3778.909180, -2514.122559, 487.537415 ),
+                Vector( -1995.260010, -1860.380859, 735.659729 ),
+            },
+            Volume = 2.25
+        }
+    },
+    [ "d1_trainstation_03" ] = {
+        [ "npc_breen" ] = {
+            Pos = "prop_flr1tv4_body",
+            Volume = 0.5
+        }
+    },
+    [ "d1_trainstation_05" ] = {
+        [ "npc_eli" ] = {
+            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
+            Volume = 0.5
+        },
+        [ "npc_alyx" ] = {
+            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
+            Volume = 0.33
+        },
+        [ "npc_vortigaunt" ] = {
+            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
+            Volume = 0.1
+        },
+        [ "npc_mossman" ] = {
+            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
+            Volume = 0.25
+        }
+    },
+    [ "d1_canals_07" ] = {
+        [ "npc_breen" ] = {
+            Pos = Vector( 10950.773438, 2099.037842, -176.808334 )
+        }
+    }
+}
+]]
+
 local aiDisabled = GetConVar( "ai_disabled" )
 local ignorePlys = GetConVar( "ai_ignoreplayers" )
 
@@ -225,8 +281,8 @@ local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregaggednpc
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
 local vcKillfeedNick            = CreateConVar( "sv_npcvoicechat_killfeednicks", "1", cvarFlag, "If NPC's killfeed name should be their voicechat nickname", 0, 1 )
-local vcPitchMin                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_min", "95", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_max", "105", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMin                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_min", "90", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_max", "110", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance should be when spawning", 0, 100 )
@@ -435,7 +491,7 @@ local function GetVoiceLine( ent, voiceType )
             if realTime < useTime then continue end
             NPCVC.LastUsedLines[ voiceLine ] = nil
         else
-            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 900 )
+            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 1800 )
         end
 
         return voiceLine
@@ -507,8 +563,23 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         EnemyPlayers = enemyPlyData,
         StartPos = npc:GetPos(),
         IsDormant = npc:IsDormant(),
-        Classname = class
+        Classname = class,
+        --OverrideVol = npc.NPCVC_OverrideVol
     }
+    
+    --[[
+    local overPos = npc.NPCVC_OverridePos
+    if !overPos then
+        overPos = {}
+    elseif isvector( overPos ) then
+        overPos = overPos:ToTable()
+        overPos.Man = 1
+    elseif isstring( overPos ) then
+        overPos = { ents.FindByName( overPos )[ 1 ] }
+        overPos.Man = 2
+    end
+    vcData.OverridePos = overPos
+    ]]
 
     SimpleTimer( ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 ), function()
         net.Start( "npcsqueakers_playsound" )
@@ -900,6 +971,18 @@ local function OnEntityCreated( npc )
                 old_PlaySoundSystem( npc, sdSet, customSd, sdType )
             end
         end
+
+        --[[
+        local mapData = specialMapData[ game.GetMap() ]
+        if !mapData then return end
+            
+        mapData = mapData[ npcClass ]
+        if !mapData then return end
+
+        PrintTable( mapData )
+        npc.NPCVC_OverridePos = mapData.Pos
+        npc.NPCVC_OverrideVol = mapData.Volume
+        ]]
     end )
 end
 
@@ -1130,8 +1213,8 @@ local function OnServerThink()
                     end
 
                     if isPurelyPanic then
-                        if !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
-                            NPCVC:PlayVoiceLine( npc, "panic" )
+                        if !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "death" ) then
+                            NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) )
                         end
 
                         if barnacled and !hlsNPCs[ npcClass ] then
@@ -1183,7 +1266,7 @@ local function OnServerThink()
                                 isPanicking = ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) )
                             end
 
-                            if curEnemy == lastEnemy and IsValid( lastEnemy ) and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 15 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
+                            if curEnemy == lastEnemy and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 30 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
                                 combatLine = "idle"
                             elseif isPanicking or lowHP and random( 1, ( 8 * ( ( npc:Health() / npc:GetMaxHealth() ) / lowHP ) ) ) == 1 then
                                 if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 250000 or npc:Visible( curEnemy ) then
@@ -1344,10 +1427,35 @@ local function OnServerShutDown()
     elseif NPCVC.MapTransitionNPCs then
         file_Write( "npcvoicechat/mapsavednpcs.json", TableToJSON( NPCVC.MapTransitionNPCs ) )
     end
+
+    local lineTbl = {}
+    local osTime, realT = os_time(), RealTime()
+    for snd, time in pairs( NPCVC.LastUsedLines ) do
+        if realT >= time then continue end
+        lineTbl[ snd ] = ( osTime + ( time - realT ) )
+    end
+    file_Write( "npcvoicechat/lastusedlines.json", TableToJSON( lineTbl ) )
 end
 
 local function OnMapInitialized()
     UpdateData()
+
+    --
+
+    local lineTbl = file_Read( "npcvoicechat/lastusedlines.json", "DATA" )
+    if lineTbl then 
+        local osTime = os_time()
+        lineTbl = JSONToTable( lineTbl )
+
+        for snd, time in pairs( lineTbl ) do
+            local finTime = ( time - osTime )
+            if finTime <= 0 then continue end
+
+            NPCVC.LastUsedLines[ snd ] = finTime
+        end
+    end
+
+    --
 
     NPCVC.OldFunc_GetDeathNoticeEntityName = ( NPCVC.OldFunc_GetDeathNoticeEntityName or GAMEMODE.GetDeathNoticeEntityName )
     if !NPCVC.OldFunc_GetDeathNoticeEntityName then return end

@@ -17,6 +17,7 @@ local PlayFile = sound.PlayFile
 local EyeAngles = EyeAngles
 local LocalPlayer = LocalPlayer
 local EyePos = EyePos
+local Vector = Vector
 local table_remove = table.remove
 local table_HasValue = table.HasValue
 local table_Merge = table.Merge
@@ -48,6 +49,8 @@ local PlaySound = surface.PlaySound
 local notification_AddLegacy = notification.AddLegacy
 local vgui_Create = vgui.Create
 local list_Get = list.Get
+local isvector = isvector
+local isentity = isentity
 
 local lambdaPopupX, lambdaPopupY
 
@@ -130,7 +133,11 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
     local ent = vcData.Emitter
     if !IsValid( ent ) then return end
 
-    PlayFile( "sound/" .. sndDir, "noplay" .. ( is3D and "3d" or "" ), function( snd, errorId, errorName )
+    local callIndex = false
+    local sndName = "sound/" .. sndDir
+    local sndFlags = "noplay" .. ( is3D and "3d" or "" )
+
+    local function SoundCallback( snd, errorId, errorName )
         if errorId == 21 then
             PlaySoundFile( sndDir, vcData, playDelay, false )
             return
@@ -138,6 +145,30 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             print( "NPC Voice Chat Error: Sound file " .. sndDir .. " failed to open!\nError Index: " .. errorName .. "#" .. errorId )
             return
         end
+
+        --[[
+        local forcePos, overridePos = vcData.OverridePos
+        if forcePos then 
+            local man = forcePos.Man
+            if !man then 
+                if !callIndex then
+                    for i = 2, #forcePos do
+                        callIndex = i
+                        PlayFile( sndName, sndFlags, SoundCallback )
+                    end
+                    
+                    overridePos = forcePos[ 1 ]
+                else
+                    overridePos = forcePos[ callIndex ]
+                end
+            elseif man == 1 then
+                overridePos = Vector( forcePos[ 1 ], forcePos[ 2 ], forcePos[ 3 ] )
+            elseif man == 2 then
+                local ent = forcePos[ 1 ]
+                overridePos = ( IsValid( ent ) and ent or nil )
+            end
+        end
+        ]]
 
         local sndLength = snd:GetLength()
         if sndLength <= 0 or !IsValid( ent ) then
@@ -162,6 +193,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
         NPCVC.SoundEmitters[ #NPCVC.SoundEmitters + 1 ] = {
             Entity = ent,
             Sound = snd,
+            --OverridePos = overridePos,
+            --OverrideVol = vcData.OverrideVol,
             LastPlayPos = playPos,
             VolumeMult = volMult,
             Is3D = is3D,
@@ -209,6 +242,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 Nick = nickName,
                 Entity = ent,
                 Sound = snd,
+                --OverridePos = overridePos,
                 LastPlayPos = playPos,
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
@@ -225,7 +259,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             net.WriteEntity( ent )
             net.WriteFloat( ( sndLength / playRate ) + playDelay )
         net.SendToServer()
-    end )
+    end
+    PlayFile( sndName, sndFlags, SoundCallback )
 end
 
 net.Receive( "npcsqueakers_getrenderbounds", function() 
@@ -326,11 +361,20 @@ local function UpdateSounds()
                 end
             end
 
+
+            local volMult = sndData.VolumeMult
+            --[[
+            local overPos = sndData.OverridePos
+            if overPos and ( isvector( overPos ) or IsValid( overPos ) ) and curPos:DistToSqr( lastPos ) > 1048576 then
+                lastPos = ( isentity( overPos ) and overPos:GetPos() or overPos )
+                volMult = ( sndData.OverrideVol or volMult )
+            end
+            ]]
+
             if isGlobal then
                 snd:SetVolume( volume )
                 snd:Set3DEnabled( false )
             else
-                local volMult = sndData.VolumeMult
                 local sndVol = ( volume * volMult )
 
                 local is3D = sndData.Is3D
@@ -373,6 +417,7 @@ local function DrawVoiceIcons()
                 end
             end 
         end
+        --if sndData.OverridePos and EyePos():DistToSqr( pos ) > 1048576 then continue end
 
         Start3D2D( pos, ang, scale )
             surface_SetDrawColor( 255, 255, 255 )
@@ -421,6 +466,13 @@ local function DrawVoiceChat()
                 vcData.LastPlayPos = lastPos
             end
         end
+
+        --[[
+        local overPos = vcData.OverridePos
+        if overPos and ( isvector( overPos ) or IsValid( overPos ) ) and curPos:DistToSqr( lastPos ) > 1048576 then
+            lastPos = ( isentity( overPos ) and overPos:GetPos() or overPos )
+        end
+        ]]
 
         local sndVol = 0
         local snd = vcData.Sound
@@ -527,7 +579,7 @@ end
 local function OnCreateClientsideRagdoll( owner, ragdoll )
     if !IsValid( owner ) then return end
     local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
-    local timerName = "npcsqueakers_fuckyounetworking" .. ragdoll:EntIndex()
+    local timerName = "npcsqueakers_fuckyounetworking" .. owner:EntIndex()
 
     CreateTimer( timerName, 0, 0, function()
         if !IsValid( ragdoll ) or !IsValid( sndEmitter ) then RemoveTimer( timerName ) return end
