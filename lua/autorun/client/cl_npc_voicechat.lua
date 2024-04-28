@@ -350,8 +350,8 @@ local function UpdateSounds()
                 sndData.IsDormant = srcEnt:IsDormant()
                 
                 if !sndData.IsDormant then
-                    lastPos = srcEnt:GetPos()
-                    sndData.LastPlayPos = lastPos
+                    lastPos = srcEnt:EyePos()
+                    sndData.LastPlayPos = srcEnt:GetPos()
                     
                     if srcEnt:IsRagdoll() then
                         local leftC, rightC = snd:GetLevel()

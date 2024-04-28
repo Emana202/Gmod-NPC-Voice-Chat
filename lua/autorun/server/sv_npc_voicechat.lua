@@ -9,6 +9,7 @@ local random = math.random
 local randomseed = math.randomseed
 local string_sub = string.sub
 local string_find = string.find
+local string_Explode = string.Explode
 local Clamp = math.Clamp
 local abs = math.abs
 local table_Empty = table.Empty
@@ -486,12 +487,15 @@ local function GetVoiceLine( ent, voiceType )
     randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
 
     for _, voiceLine in RandomPairs( voiceTbl ) do
-        local useTime = NPCVC.LastUsedLines[ voiceLine ]
+        local pathTbl = string_Explode( "/", voiceLine, false )
+        local voiceFile = pathTbl[ #pathTbl ]
+
+        local useTime = NPCVC.LastUsedLines[ voiceFile ]
         if useTime then
             if realTime < useTime then continue end
-            NPCVC.LastUsedLines[ voiceLine ] = nil
+            NPCVC.LastUsedLines[ voiceFile ] = nil
         else
-            NPCVC.LastUsedLines[ voiceLine ] = ( realTime + 1800 )
+            NPCVC.LastUsedLines[ voiceFile ] = ( realTime + 1800 )
         end
 
         return voiceLine
@@ -535,7 +539,7 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     local sndEmitter = ents_Create( "npc_vc_sndemitter" )
     if !IsValid( sndEmitter ) then return end
 
-    sndEmitter:SetPos( npc:GetPos() )
+    sndEmitter:SetPos( npc:EyePos() )
     sndEmitter:SetOwner( npc )
     sndEmitter.DontRemoveEntity = dontDeleteOnRemove
     sndEmitter.VoiceType = voiceType
@@ -1304,7 +1308,7 @@ local function OnServerThink()
                                             NPCVC:PlayVoiceLine( npc, combatLine )
                                         end
                                     elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT or curState == NPC_STATE_SCRIPT ) and vcAllowLines_Idle:GetBool() then
-                                        NPCVC:PlayVoiceLine( npc, "idle" )
+                                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
                                     end
                                 end
                             end
@@ -1395,6 +1399,12 @@ end
 
 local function OnAcceptInput( ent, input, activator, caller, value )
     if !IsValid( ent ) or !ent.NPCVC_Initialized or NPCVC:IsCurrentlySpeaking( ent, "death" ) then return end
+    
+    if input == "Use" and ( random( 1, 100 ) <= ent.NPCVC_SpeechChance ) and !NPCVC:IsCurrentlySpeaking( ent ) and IsValid( activator ) and activator:IsPlayer() and NPCVC:GetDispositionOfNPC( ent, activator ) == D_LI and !IsValid( ent:GetEnemy() ) then
+        NPCVC:PlayVoiceLine( ent, ent.NPCVC_IdleVoiceType )
+        ent.NPCVC_NextIdleSpeak = ( CurTime() + random( 0, 15 ) )
+        return
+    end
 
     if input == "BecomeRagdoll" then
         OnNPCKilled( ent, activator, caller, true )
