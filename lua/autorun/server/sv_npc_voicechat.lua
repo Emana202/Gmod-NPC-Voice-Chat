@@ -483,7 +483,7 @@ local function GetVoiceLine( ent, voiceType )
     end
     if !voiceTbl or #voiceTbl == 0 then return end
 
-    local realTime = RealTime()
+    local realTime = CurTime()
     randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
 
     for _, voiceLine in RandomPairs( voiceTbl ) do
@@ -1439,7 +1439,7 @@ local function OnServerShutDown()
     end
 
     local lineTbl = {}
-    local osTime, realT = os_time(), RealTime()
+    local osTime, realT = os_time(), CurTime()
     for snd, time in pairs( NPCVC.LastUsedLines ) do
         if realT >= time then continue end
         lineTbl[ snd ] = ( osTime + ( time - realT ) )
