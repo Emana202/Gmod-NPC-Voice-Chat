@@ -779,7 +779,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if locAttacker == npc then
-            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and IsSinglePlayer() ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) then
+            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and IsSinglePlayer() ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) then
                 NPCVC:PlayVoiceLine( npc, ( random( 1, 5 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
