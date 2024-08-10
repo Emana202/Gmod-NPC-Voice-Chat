@@ -606,8 +606,17 @@ function NPCVC:StopCurrentSpeech( npc, voiceType )
     sndEmitter.SpeechPlayTime = 0
 end
 
-function NPCVC:IsCurrentlySpeaking( npc, voiceType )
-    if voiceType and npc.NPCVC_LastVoiceLine != voiceType then return false end
+function NPCVC:IsCurrentlySpeaking( npc, ... )
+    local args = { ... }
+    if #args != 0 then
+        local lastType = npc.NPCVC_LastVoiceLine
+        local isSpeaking = false
+        for _, voiceType in ipairs( args ) do
+            if lastType != voiceType then continue end
+            isSpeaking = true; break
+        end
+        if !isSpeaking then return false end
+    end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     return ( IsValid( sndEmitter ) and RealTime() <= sndEmitter.SpeechPlayTime )
 end
@@ -769,6 +778,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     local killLines = vcAllowLines_KillEnemy:GetBool()
     local witnessLines = vcAllowLines_WitnessDeath:GetBool()
     local assistLines = vcAllowLines_Assist:GetBool()
+    local isSingle = IsSinglePlayer()
 
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
         if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 4 ) != 1 and NPCVC:IsCurrentlySpeaking( npc ) ) then continue end
@@ -779,7 +789,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if locAttacker == npc then
-            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and IsSinglePlayer() ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh" ) and !NPCVC:IsCurrentlySpeaking( npc, "kill" ) and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) then
+            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and isSingle ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh", "kill", "taunt" ) then
                 NPCVC:PlayVoiceLine( npc, ( random( 1, 5 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
@@ -800,7 +810,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 NPCVC:PlayVoiceLine( npc, "assist" )
                 continue
             end
-            if ( isEnemy or NPCVC:GetDispositionOfNPC( npc, ent ) >= 3 ) and entPos:DistToSqr( npc:GetPos() ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "witness" ) then
+            if ( isEnemy or NPCVC:GetDispositionOfNPC( npc, ent ) >= 3 ) and entPos:DistToSqr( npc:GetPos() ) <= ( !npc:Visible( ent ) and 40000 or 4000000 ) and !NPCVC:IsCurrentlySpeaking( npc, "panic", "witness" ) then
                 NPCVC:PlayVoiceLine( npc, ( ( !isEnemy and random( 1, 3 ) == 1 ) and "panic" or "witness" ) )
                 continue
             end
@@ -1217,7 +1227,7 @@ local function OnServerThink()
                     end
 
                     if isPurelyPanic then
-                        if !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and !NPCVC:IsCurrentlySpeaking( npc, "death" ) then
+                        if !NPCVC:IsCurrentlySpeaking( npc, "panic", "death" ) then
                             NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) )
                         end
 
