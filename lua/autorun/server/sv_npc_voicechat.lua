@@ -727,7 +727,7 @@ end
 
 local function GetNPCProfilePicture( npc )
     if vcUseCustomPfps:GetBool() then
-        if vcUseLambdaPfpPics:GetBool() and #Lambdaprofilepictures != 0 then
+        if vcUseLambdaPfpPics:GetBool() and Lambdaprofilepictures and #Lambdaprofilepictures != 0 then
             return Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
         else
             local userPfps, pfpPics = NPCVC.UserPFPs
