@@ -578,13 +578,15 @@ end
 
 local function OnCreateClientsideRagdoll( owner, ragdoll )
     if !IsValid( owner ) then return end
-    local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
     local timerName = "npcsqueakers_fuckyounetworking" .. owner:EntIndex()
+    local failTime = ( CurTime() + 1 )
 
     CreateTimer( timerName, 0, 0, function()
-        if !IsValid( ragdoll ) or !IsValid( sndEmitter ) then RemoveTimer( timerName ) return end
-        if !sndEmitter.SetSoundSource then return end
+        if !IsValid( owner ) or !IsValid( ragdoll ) or CurTime() >= failTime then RemoveTimer( timerName ) return end  
 
+        local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
+        if !IsValid( sndEmitter ) or !sndEmitter.SetSoundSource then return end
+        
         sndEmitter:SetSoundSource( ragdoll )
         RemoveTimer( timerName )
     end )
@@ -1431,6 +1433,7 @@ local function PopulateToolMenu()
 
         panel:Help( "NPC Type Toggles:" )
         AddSettingsPanel( panel, false, "CheckBox", "Standard NPCs", "sv_npcvoicechat_allownpc" )
+        AddSettingsPanel( panel, false, "CheckBox", "Physics Props (& maybe more...?)", "sv_npcvoicechat_allowprops" )
         if VJBASE_VERSION then AddSettingsPanel( panel, false, "CheckBox", "VJ Base SNPCs", "sv_npcvoicechat_allowvjbase" ) end
         if DrGBase then AddSettingsPanel( panel, false, "CheckBox", "DrGBase Nextbots", "sv_npcvoicechat_allowdrgbase" ) end
         AddSettingsPanel( panel, false, "CheckBox", "2D Chase (Sanic-like) Nextbots", "sv_npcvoicechat_allowsanic" )
@@ -1439,6 +1442,7 @@ local function PopulateToolMenu()
         if DOOM then AddSettingsPanel( panel, false, "CheckBox", "GMDoom Demons", "sv_npcvoicechat_allowgmdoom" ) end
         panel:Help( "------------------------------------------------------------" )
 
+        AddSettingsPanel( panel, false, "CheckBox", "Disable Offensive Lines", "sv_npcvoicechat_censorcertainlines", "If enabled, disables certain offensive voicelines from playing" )
         AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregaggednpcs", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
@@ -1449,40 +1453,30 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, false, "CheckBox", "Ignore PVS", "sv_npcvoicechat_ignorepvs", "If NPCs that are currently not processed in the client realm should still be able to use the voice chat." )
         AddSettingsPanel( panel, false, "CheckBox", "No Idle Lines Outside PVS", "sv_npcvoicechat_ignorepvs_noidle", "If enabled, the 'Ignore PVS' setting will not affect the idle voicelines." )
 
-        local minSpeechChan = AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance should be when spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Minimum Speech Chance", "sv_npcvoicechat_minimumspeechchance", "The minimum value the NPC's random speech chance should be when spawning", {
+            min = 1,
             max = 100
         } )
-        local maxSpeechChan = AddSettingsPanel( panel, false, "NumSlider", "Maximum Speech Chance", "sv_npcvoicechat_maximumspeechchance", "The maximum value the NPC's random speech chance should be when spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Maximum Speech Chance", "sv_npcvoicechat_maximumspeechchance", "The maximum value the NPC's random speech chance should be when spawning", {
+            min = 1,
             max = 100
         } )
-        function minSpeechChan:OnValueChanged( value )
-            maxSpeechChan:SetMin( value )
-        end
-        function maxSpeechChan:OnValueChanged( value )
-            minSpeechChan:SetMax( value )
-        end
 
-        local minPitch = AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_initvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
             min = 10,
-            max = 100
-        } )
-        local maxPitch = AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
-            min = 100,
             max = 255
         } )
-        function minPitch:OnValueChanged( value )
-            maxPitch:SetMin( value )
-        end
-        function maxPitch:OnValueChanged( value )
-            minPitch:SetMax( value )
-        end
+        AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_initvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
+            min = 10,
+            max = 255
+        } )
         
         AddSettingsPanel( panel, false, "NumSlider", "Speak Limit", "sv_npcvoicechat_speaklimit", "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", {
             max = 25
         } )
         AddSettingsPanel( panel, false, "CheckBox", "Limit Doesn't Affect Death", "sv_npcvoicechat_speaklimit_dontaffectdeath", "If the speak limit shouldn't affect NPCs that are playing their death voiceline" )
 
-        AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "If NPC's speech chance should also affect its playing of death voicelines." ) 
+        AddSettingsPanel( panel, false, "CheckBox", "Speech Chance Affects Death", "sv_npcvoicechat_speechchanceaffectsdeath", "If NPC's speech chance should also affect its playing of death voicelines." ) 
         AddSettingsPanel( panel, false, "CheckBox", "Save Voice Data Of Essential NPCs", "sv_npcvoicechat_savenpcdataonmapchange", "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when sometimes appearing and etc.\nRecommended to turn off when not playing any campaign!" ) 
         AddSettingsPanel( panel, false, "CheckBox", "Use Sound Hints For Detecting Dangers", "sv_npcvoicechat_usesoundhintsforspottingdanger", "If enabled, NPCs will use the sound hint system to detect dangers. Ex. This will allow for nextbots and non-intelligent NPCs to panic for being near a HL2 grenade and etc." ) 
 

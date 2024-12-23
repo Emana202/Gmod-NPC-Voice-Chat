@@ -11,6 +11,7 @@ local string_sub = string.sub
 local string_find = string.find
 local string_Explode = string.Explode
 local Clamp = math.Clamp
+local min = math.min
 local abs = math.abs
 local table_Empty = table.Empty
 local table_Merge = table.Merge
@@ -269,6 +270,7 @@ file.CreateDir( "npcvoicechat" )
 
 local vcEnabled                 = CreateConVar( "sv_npcvoicechat_enabled", "1", cvarFlag, "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcAllowNPCs               = CreateConVar( "sv_npcvoicechat_allownpc", "1", cvarFlag, "If standard NPCs or the ones that are based on them like ANP are allowed to use voicechat", 0, 1 )
+local vcAllowProps              = CreateConVar( "sv_npcvoicechat_allowprops", "0", cvarFlag, "If physics props should gain a voice chat", 0, 1 )
 local vcAllowVJBase             = CreateConVar( "sv_npcvoicechat_allowvjbase", "1", cvarFlag, "If VJ Base SNPCs are allowed to use voicechat", 0, 1 )
 local vcAllowDrGBase            = CreateConVar( "sv_npcvoicechat_allowdrgbase", "1", cvarFlag, "If DrGBase nextbots are allowed to use voicechat", 0, 1 )
 local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1", cvarFlag, "If 2D nextbots like Sanic or Obunga are allowed to use voicechat", 0, 1 )
@@ -282,13 +284,14 @@ local vcIgnoreGagged            = CreateConVar( "sv_npcvoicechat_ignoregaggednpc
 local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "1", cvarFlag, "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time", 0, 1 )
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
 local vcKillfeedNick            = CreateConVar( "sv_npcvoicechat_killfeednicks", "1", cvarFlag, "If NPC's killfeed name should be their voicechat nickname", 0, 1 )
-local vcPitchMin                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_min", "90", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_spawnvoicepitch_max", "110", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMin                = CreateConVar( "sv_npcvoicechat_initvoicepitch_min", "85", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_initvoicepitch_max", "135", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcCensorLines             = CreateConVar( "sv_npcvoicechat_censorcertainlines", "1", cvarFlag, "If enabled, makes certain offensive voicelines to not play", 0, 1 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance should be when spawning", 0, 100 )
 local vcMaxSpeechChance         = CreateConVar( "sv_npcvoicechat_maximumspeechchance", "100", cvarFlag, "The maximum value the NPC's random speech chance should be when spawning", 0, 100 )
-local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeathvoicelines", "0", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
+local vcVoiceChanceAffectDeath  = CreateConVar( "sv_npcvoicechat_speechchanceaffectsdeath", "1", cvarFlag, "If NPC's speech chance should also affect its playing of death voicelines", 0, 1 )
 local vcSaveNPCDataOnMapChange  = CreateConVar( "sv_npcvoicechat_savenpcdataonmapchange", "0", cvarFlag, "If essential NPCs from Half-Life campaigns should save their voicechat data. This will for example prevent them from having a different name when appearing after map change and etc.", 0, 1 )
 local vcUseSoundHintsForDangers = CreateConVar( "sv_npcvoicechat_usesoundhintsforspottingdanger", "1", cvarFlag, "If enabled, NPCs will use the sound hint system to detect dangers. Ex. This will allow for all NPCs to panic on being near a grenade and etc.", 0, 1 )
 
@@ -298,6 +301,7 @@ local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames"
 local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
 local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
 local vcVoiceProfileFallback    = CreateConVar( "sv_npcvoicechat_voiceprofilefallbacks", "0", cvarFlag, "If NPC with a voice profile should fallback to default voicelines if its profile doesn't have a specified voice type in it" )
+local vcCensoringLineMode       = CreateConVar( "sv_npcvoicechat_censoringmode", "0", cvarFlag, "" )
 
 local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
 local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
@@ -472,6 +476,297 @@ function nextbotMETA:BecomeRagdoll( dmginfo )
     return ragdoll
 end
 
+--
+
+NPCVC.CensoredLines = {
+    [ "npcvc_idle9.mp3" ] = true,
+    [ "npcvc_idle52.mp3" ] = true,
+    [ "npcvc_idle53.mp3" ] = true,
+    [ "npcvc_idle54.mp3" ] = true,
+    [ "npcvc_idle55.mp3" ] = true,
+    [ "npcvc_idle56.mp3" ] = true,
+    [ "npcvc_idle59.mp3" ] = true,
+    [ "npcvc_idle60.mp3" ] = true,
+    [ "npcvc_idle61.mp3" ] = true,
+    [ "npcvc_idle107.mp3" ] = true,
+    [ "npcvc_idle110.mp3" ] = true,
+    [ "npcvc_idle115.mp3" ] = true,
+    [ "npcvc_idle123.mp3" ] = true,
+    [ "npcvc_idle124.mp3" ] = true,
+    [ "npcvc_idle125.mp3" ] = true,
+    [ "npcvc_idle128.mp3" ] = true,
+    [ "npcvc_idle138.mp3" ] = true,
+    [ "npcvc_idle156.mp3" ] = true,
+    [ "npcvc_idle160.mp3" ] = true,
+    [ "npcvc_idle164.mp3" ] = true,
+    [ "npcvc_idle181.mp3" ] = true,
+    [ "npcvc_idle195.mp3" ] = true,
+    [ "npcvc_idle206.mp3" ] = true,
+    [ "npcvc_idle207.mp3" ] = true,
+    [ "npcvc_idle209.mp3" ] = true,
+    [ "npcvc_idle210.mp3" ] = true,
+    [ "npcvc_idle211.mp3" ] = true,
+    [ "npcvc_idle218.mp3" ] = true,
+    [ "npcvc_idle222.mp3" ] = true,
+    [ "npcvc_idle226.mp3" ] = true,
+    [ "npcvc_idle250.mp3" ] = true,
+    [ "npcvc_idle260.mp3" ] = true,
+    [ "npcvc_idle262.mp3" ] = true,
+    [ "npcvc_idle270.mp3" ] = true,
+    [ "npcvc_idle277.mp3" ] = true,
+    [ "npcvc_idle288.mp3" ] = true,
+    [ "npcvc_idle289.mp3" ] = true,
+    [ "npcvc_idle315.mp3" ] = true,
+    [ "npcvc_idle330.mp3" ] = true,
+    [ "npcvc_idle333.mp3" ] = true,
+    [ "npcvc_idle348.mp3" ] = true,
+    [ "npcvc_idle359.mp3" ] = true,
+    [ "npcvc_idle367.mp3" ] = true,
+    [ "npcvc_idle369.mp3" ] = true,
+    [ "npcvc_idle370.mp3" ] = true,
+    [ "npcvc_idle380.mp3" ] = true,
+    [ "npcvc_idle383.mp3" ] = true,
+    [ "npcvc_idle389.mp3" ] = true,
+    [ "npcvc_idle392.mp3" ] = true,
+    [ "npcvc_idle394.mp3" ] = true,
+    [ "npcvc_idle402.mp3" ] = true,
+    [ "npcvc_idle479.mp3" ] = true,
+    [ "npcvc_idle482.mp3" ] = true,
+    [ "npcvc_idle490.mp3" ] = true,
+    [ "npcvc_idle492.mp3" ] = true,
+    [ "npcvc_idle501.mp3" ] = true,
+    [ "npcvc_idle505.mp3" ] = true,
+    [ "npcvc_idle509.mp3" ] = true,
+    [ "npcvc_idle521.mp3" ] = true,
+    [ "npcvc_idle522.mp3" ] = true,
+    [ "npcvc_idle526.mp3" ] = true,
+    [ "npcvc_idle538.mp3" ] = true,
+    [ "npcvc_idle542.mp3" ] = true,
+    [ "npcvc_idle572.mp3" ] = true,
+    [ "npcvc_idle575.mp3" ] = true,
+    [ "npcvc_idle579.mp3" ] = true,
+    [ "npcvc_idle580.mp3" ] = true,
+    [ "npcvc_idle587.mp3" ] = true,
+    [ "npcvc_idle602.mp3" ] = true,
+    [ "npcvc_idle603.mp3" ] = true,
+    [ "npcvc_idle605.mp3" ] = true,
+    [ "npcvc_idle623.mp3" ] = true,
+    [ "npcvc_idle625.mp3" ] = true,
+    [ "npcvc_idle628.mp3" ] = true,
+    [ "npcvc_idle637.mp3" ] = true,
+    [ "npcvc_idle638.mp3" ] = true,
+    [ "npcvc_idle651.mp3" ] = true,
+    [ "npcvc_idle653.mp3" ] = true,
+    [ "npcvc_idle654.mp3" ] = true,
+    [ "npcvc_idle659.mp3" ] = true,
+    [ "npcvc_idle661.mp3" ] = true,
+    [ "npcvc_idle663.mp3" ] = true,
+    [ "npcvc_idle667.mp3" ] = true,
+    [ "npcvc_idle668.mp3" ] = true,
+    [ "npcvc_idle691.mp3" ] = true,
+    [ "npcvc_idle692.mp3" ] = true,
+    [ "npcvc_idle700.mp3" ] = true,
+    [ "npcvc_idle706.mp3" ] = true,
+    [ "npcvc_idle707.mp3" ] = true,
+    [ "npcvc_idle709.mp3" ] = true,
+    [ "npcvc_idle718.mp3" ] = true,
+    [ "npcvc_idle727.mp3" ] = true,
+    [ "npcvc_idle738.mp3" ] = true,
+    [ "npcvc_idle743.mp3" ] = true,
+    [ "npcvc_idle747.mp3" ] = true,
+    [ "npcvc_idle767.mp3" ] = true,
+    [ "npcvc_idle782.mp3" ] = true,
+    [ "npcvc_idle796.mp3" ] = true,
+    [ "npcvc_idle797.mp3" ] = true,
+    [ "npcvc_idle798.mp3" ] = true,
+    [ "npcvc_idle799.mp3" ] = true,
+    [ "npcvc_idle801.mp3" ] = true,
+    [ "npcvc_idle809.mp3" ] = true,
+    [ "npcvc_idle816.mp3" ] = true,
+    [ "npcvc_idle819.mp3" ] = true,
+    [ "npcvc_idle853.mp3" ] = true,
+    [ "npcvc_idle854.mp3" ] = true,
+    [ "npcvc_idle856.mp3" ] = true,
+    [ "npcvc_idle860.mp3" ] = true,
+    [ "npcvc_idle865.mp3" ] = true,
+    [ "npcvc_idle868.mp3" ] = true,
+    [ "npcvc_idle870.mp3" ] = true,
+    [ "npcvc_idle883.mp3" ] = true,
+    [ "npcvc_idle886.mp3" ] = true,
+    [ "npcvc_idle889.mp3" ] = true,
+    [ "npcvc_idle890.mp3" ] = true,
+    [ "npcvc_idle892.mp3" ] = true,
+    [ "npcvc_idle893.mp3" ] = true,
+    [ "npcvc_idle894.mp3" ] = true,
+    [ "npcvc_idle899.mp3" ] = true,
+    [ "npcvc_idle903.mp3" ] = true,
+    [ "npcvc_idle905.mp3" ] = true,
+    [ "npcvc_idle906.mp3" ] = true,
+    [ "npcvc_idle907.mp3" ] = true,
+    [ "npcvc_idle908.mp3" ] = true,
+    [ "npcvc_idle914.mp3" ] = true,
+    [ "npcvc_idle915.mp3" ] = true,
+    [ "npcvc_idle916.mp3" ] = true,
+    [ "npcvc_idle920.mp3" ] = true,
+    [ "npcvc_idle929.mp3" ] = true,
+    [ "npcvc_idle930.mp3" ] = true,
+    [ "npcvc_idle931.mp3" ] = true,
+    [ "npcvc_idle937.mp3" ] = true,
+    [ "npcvc_idle938.mp3" ] = true,
+    [ "npcvc_idle941.mp3" ] = true,
+    [ "npcvc_idle942.mp3" ] = true,
+    [ "npcvc_idle956.mp3" ] = true,
+    [ "npcvc_idle960.mp3" ] = true,
+    [ "npcvc_idle966.mp3" ] = true,
+    [ "npcvc_idle967.mp3" ] = true,
+    [ "npcvc_idle968.mp3" ] = true,
+    [ "npcvc_idle971.mp3" ] = true,
+    [ "npcvc_idle974.mp3" ] = true,
+    [ "npcvc_idle975.mp3" ] = true,
+    [ "npcvc_idle975.mp3" ] = true,
+    [ "npcvc_idle1006.mp3" ] = true,
+    [ "npcvc_idle1010.mp3" ] = true,
+    [ "npcvc_idle1040.mp3" ] = true,
+    [ "npcvc_idle1048.mp3" ] = true,
+    [ "npcvc_idle1087.mp3" ] = true,
+    [ "npcvc_idle1103.mp3" ] = true,
+    [ "npcvc_idle1243.mp3" ] = true,
+    [ "npcvc_idle1276.mp3" ] = true,
+    [ "npcvc_idle1337.mp3" ] = true,
+    [ "npcvc_idle1347.mp3" ] = true,
+    [ "npcvc_idle1368.mp3" ] = true,
+    [ "npcvc_idle1377.mp3" ] = true,
+    [ "npcvc_idle1410.mp3" ] = true,
+    [ "npcvc_idle1423.mp3" ] = true,
+    [ "npcvc_idle1424.mp3" ] = true,
+    [ "npcvc_idle1448.mp3" ] = true,
+    [ "npcvc_idle1452.mp3" ] = true,
+    [ "npcvc_idle1482.mp3" ] = true,
+    [ "npcvc_idle1523.mp3" ] = true,
+    [ "npcvc_idle1537.mp3" ] = true,
+    [ "npcvc_idle1536.mp3" ] = true,
+    [ "npcvc_idle1551.mp3" ] = true,
+    [ "npcvc_idle1553.mp3" ] = true,
+    [ "npcvc_idle1560.mp3" ] = true,
+    [ "npcvc_idle1561.mp3" ] = true,
+
+    [ "npcvc_death222.mp3" ] = true,
+    [ "npcvc_death239.mp3" ] = true,
+    [ "npcvc_death240.mp3" ] = true,
+    [ "npcvc_death243.mp3" ] = true,
+    [ "npcvc_death259.mp3" ] = true,
+    [ "npcvc_death260.mp3" ] = true,
+    [ "npcvc_death261.mp3" ] = true,
+    [ "npcvc_death261.mp3" ] = true,
+    [ "npcvc_death343.mp3" ] = true,
+    [ "npcvc_death362.mp3" ] = true,
+    [ "npcvc_death363.mp3" ] = true,
+    [ "npcvc_death369.mp3" ] = true,
+    [ "npcvc_death378.mp3" ] = true,
+    [ "npcvc_death379.mp3" ] = true,
+    [ "npcvc_death380.mp3" ] = true,
+    [ "npcvc_death388.mp3" ] = true,
+    [ "npcvc_death397.mp3" ] = true,
+    [ "npcvc_death399.mp3" ] = true,
+    [ "npcvc_death413.mp3" ] = true,
+    [ "npcvc_death420.mp3" ] = true,
+    [ "npcvc_death425.mp3" ] = true,
+    [ "npcvc_death428.mp3" ] = true,
+    [ "npcvc_death437.mp3" ] = true,
+    [ "npcvc_death442.mp3" ] = true,
+    [ "npcvc_death443.mp3" ] = true,
+    [ "npcvc_death448.mp3" ] = true,
+    [ "npcvc_death460.mp3" ] = true,
+    [ "npcvc_death465.mp3" ] = true,
+    [ "npcvc_death470.mp3" ] = true,
+    [ "npcvc_death471.mp3" ] = true,
+    [ "npcvc_death472.mp3" ] = true,
+    [ "npcvc_death476.mp3" ] = true,
+    [ "npcvc_death495.mp3" ] = true,
+    [ "npcvc_death509.mp3" ] = true,
+    [ "npcvc_death521.mp3" ] = true,
+    [ "npcvc_death552.mp3" ] = true,
+    [ "npcvc_death680.mp3" ] = true,
+    [ "npcvc_death707.mp3" ] = true,
+    [ "npcvc_death712.mp3" ] = true,
+    [ "npcvc_death716.mp3" ] = true,
+    [ "npcvc_death720.mp3" ] = true,
+    [ "npcvc_death738.mp3" ] = true,
+    [ "npcvc_death740.mp3" ] = true,
+    [ "npcvc_death802.mp3" ] = true,
+
+    [ "npcvc_assist334.mp3" ] = true,
+    [ "npcvc_assist323.mp3" ] = true,
+    [ "npcvc_assist315.mp3" ] = true,
+    [ "npcvc_assist313.mp3" ] = true,
+    [ "npcvc_assist308.mp3" ] = true,
+    [ "npcvc_assist307.mp3" ] = true,
+    [ "npcvc_assist304.mp3" ] = true,
+    [ "npcvc_assist299.mp3" ] = true,
+    [ "npcvc_assist284.mp3" ] = true,
+    [ "npcvc_assist283.mp3" ] = true,
+    [ "npcvc_assist281.mp3" ] = true,
+    [ "npcvc_assist273.mp3" ] = true,
+    [ "npcvc_assist271.mp3" ] = true,
+    [ "npcvc_assist264.mp3" ] = true,
+    [ "npcvc_assist260.mp3" ] = true,
+    [ "npcvc_assist259.mp3" ] = true,
+    [ "npcvc_assist254.mp3" ] = true,
+    [ "npcvc_assist150.mp3" ] = true,
+    [ "npcvc_assist129.mp3" ] = true,
+    [ "npcvc_assist128.mp3" ] = true,
+    [ "npcvc_assist123.mp3" ] = true,
+    [ "npcvc_assist111.mp3" ] = true,
+    [ "npcvc_assist103.mp3" ] = true,
+    [ "npcvc_assist102.mp3" ] = true,
+    [ "npcvc_assist75.mp3" ] = true,
+    [ "npcvc_assist74.mp3" ] = true,
+    [ "npcvc_assist73.mp3" ] = true,
+
+    [ "npcvc_taunt393.mp3" ] = true,
+    [ "npcvc_taunt394.mp3" ] = true,
+    [ "npcvc_taunt395.mp3" ] = true,
+    [ "npcvc_taunt401.mp3" ] = true,
+    [ "npcvc_taunt403.mp3" ] = true,
+    [ "npcvc_taunt409.mp3" ] = true,
+    [ "npcvc_taunt416.mp3" ] = true,
+    [ "npcvc_taunt432.mp3" ] = true,
+    [ "npcvc_taunt433.mp3" ] = true,
+    [ "npcvc_taunt437.mp3" ] = true,
+    [ "npcvc_taunt440.mp3" ] = true,
+    [ "npcvc_taunt467.mp3" ] = true,
+    [ "npcvc_taunt497.mp3" ] = true,
+    [ "npcvc_taunt498.mp3" ] = true,
+    [ "npcvc_taunt518.mp3" ] = true,
+    [ "npcvc_taunt526.mp3" ] = true,
+    [ "npcvc_taunt529.mp3" ] = true,
+    [ "npcvc_taunt558.mp3" ] = true,
+    [ "npcvc_taunt560.mp3" ] = true,
+    [ "npcvc_taunt563.mp3" ] = true,
+    [ "npcvc_taunt573.mp3" ] = true,
+    [ "npcvc_taunt597.mp3" ] = true,
+    [ "npcvc_taunt716.mp3" ] = true,
+    [ "npcvc_taunt846.mp3" ] = true,
+    [ "npcvc_taunt861.mp3" ] = true,
+    [ "npcvc_taunt863.mp3" ] = true,
+    [ "npcvc_taunt866.mp3" ] = true,
+    [ "npcvc_taunt868.mp3" ] = true,
+    [ "npcvc_taunt875.mp3" ] = true,
+    [ "npcvc_taunt883.mp3" ] = true,
+    [ "npcvc_taunt904.mp3" ] = true,
+    [ "npcvc_taunt921.mp3" ] = true,
+    [ "npcvc_taunt927.mp3" ] = true,
+    [ "npcvc_taunt934.mp3" ] = true,
+    [ "npcvc_taunt938.mp3" ] = true,
+    [ "npcvc_taunt941.mp3" ] = true,
+    [ "npcvc_taunt946.mp3" ] = true,
+    [ "npcvc_taunt947.mp3" ] = true,
+    [ "npcvc_taunt954.mp3" ] = true,
+    [ "npcvc_taunt958.mp3" ] = true,
+}
+
+--
+
 local function GetVoiceLine( ent, voiceType )
     local voiceTbl
     local voicePfp = NPCVC.VoiceProfiles[ ent.NPCVC_VoiceProfile ]
@@ -486,9 +781,15 @@ local function GetVoiceLine( ent, voiceType )
     local realTime = CurTime()
     randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
 
+    local censorship = vcCensorLines:GetBool()
     for _, voiceLine in RandomPairs( voiceTbl ) do
         local pathTbl = string_Explode( "/", voiceLine, false )
         local voiceFile = pathTbl[ #pathTbl ]
+        
+        if censorship and NPCVC.CensoredLines[ voiceFile ] then
+            -- print( voiceFile )
+            continue
+        end
 
         local useTime = NPCVC.LastUsedLines[ voiceFile ]
         if useTime then
@@ -585,11 +886,16 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     vcData.OverridePos = overPos
     ]]
 
+    local delayT = 0
+    if vcSlightDelay:GetBool() then
+        delayT = Rand( 0, 0.75 )
+    end
+
     SimpleTimer( ( ( IsSinglePlayer() and isInput != true ) and 0 or 0.1 ), function()
         net.Start( "npcsqueakers_playsound" )
             net.WriteString( sndName )
             net.WriteTable( vcData )
-            net.WriteFloat( !vcSlightDelay:GetBool() and 0 or Rand( 0.1, 0.75 ) )
+            net.WriteFloat( delayT )
         net.Broadcast()
     end )
     if IsValid( oldEmitter ) then oldEmitter:Remove() end
@@ -657,6 +963,40 @@ function NPCVC:GetDispositionOfNPC( npc, target )
 
     local dispFunc = npc.Disposition
     return ( dispFunc and dispFunc( npc, target ) or ( target:GetClass() == npc:GetClass() and D_LI or D_HT ) )
+end
+
+local propClasses = {
+    [ "prop_physics" ] = true,
+    [ "grenade_helicopter" ] = true,
+    [ "prop_combine_ball" ] = true,
+    [ "combine_mine" ] = true,
+    [ "rpg_missile" ] = true,
+    [ "item_ammo_ar2" ] = true,
+    [ "item_ammo_ar2_large" ] = true,
+    [ "item_ammo_ar2_altfire" ] = true,
+    [ "item_ammo_crossbow" ] = true,
+    [ "item_box_buckshot" ] = true,
+    [ "item_ammo_357" ] = true,
+    [ "item_ammo_357_large" ] = true,
+    [ "item_healthkit" ] = true,
+    [ "item_healthvial" ] = true,
+    [ "item_battery" ] = true,
+    [ "item_ammo_smg1" ] = true,
+    [ "item_ammo_smg1_large" ] = true,
+    [ "item_ammo_smg1_grenade" ] = true,
+    [ "item_ammo_pistol" ] = true,
+    [ "item_ammo_pistol_large" ] = true,
+    [ "weapon_striderbuster" ] = true,
+    [ "npc_grenade_frag" ] = true,
+    [ "grenade_ar2" ] = true,
+    [ "crossbow_bolt" ] = true,
+    [ "hunter_flechette" ] = true,
+    [ "npc_grenade_bugbait" ] = true,
+    [ "item_rpg_round" ] = true
+}
+
+function NPCVC:IsPhysicsProp( ent )
+    return ( propClasses[ ent:GetClass() ] )
 end
 
 function NPCVC:GetNPCRealName( npc )
@@ -839,7 +1179,7 @@ local function OnEntityCreated( npc )
         local npcClass = npc:GetClass()
         local whitelistVoice = NPCVC.NPCWhitelist[ npcClass ]
         if !whitelistVoice then
-            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
+            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and ( !NPCVC:IsPhysicsProp( npc ) or !vcAllowProps:GetBool() ) and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
             if npc.Base == "npc_vj_tankg_base" then return end
         end
@@ -853,18 +1193,22 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastState = -1
         npc.NPCVC_LastVoiceLine = ""
         npc.NPCVC_IdleVoiceType = ( whitelistVoice != true and whitelistVoice or "idle" )
+        npc.NPCVC_NextPanicCheck = 0
 
         if npc.LastPathingInfraction then
             npc.NPCVC_VoiceIconHeight = 138
             npc.NPCVC_VoiceVolumeScale = 2
         else
-            local scale = npc:GetModelScale()
-            if !scale then scale = 1.0 end
+            local scale = ( npc:GetModelScale() or 1 )
             local height = ( npcIconHeights[ npcClass ] or ( ( npc:OBBMaxs().z + 10 ) * scale )  )
             local isTwo = istable( height )
+            local isProp = NPCVC:IsPhysicsProp( npc )
 
             npc.NPCVC_VoiceIconHeight = ( isTwo and height[ 2 ] or height )
-            npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( isTwo and height[ 1 ] or height ) / 72 ), 0.66, 3.33 )
+
+            local volScale = ( abs( isTwo and height[ 1 ] or height ) / ( isProp and 40 or 72 ) )
+            if !isProp then volScale = Clamp( volScale, 0.66, 3.33 ) end
+            npc.NPCVC_VoiceVolumeScale = volScale
 
             if !isTwo then
                 local mins, maxs = npc:GetModelRenderBounds()
@@ -896,9 +1240,12 @@ local function OnEntityCreated( npc )
             local speechChance = random( vcMinSpeechChance:GetInt(), vcMaxSpeechChance:GetInt() )
             npc.NPCVC_SpeechChance = speechChance
             
+            local voiceScale = min( npc.NPCVC_VoiceVolumeScale, 1 )
             local voicePitch = random( vcPitchMin:GetInt(), vcPitchMax:GetInt() )
-            npc.NPCVC_VoicePitch = voicePitch
-            
+            local finalPitch = ( ( 1 / voiceScale ) * voicePitch )
+            -- print( voicePitch, voiceScale, finalPitch )
+            npc.NPCVC_VoicePitch = Clamp( finalPitch, 80, 150 )
+
             local nickName
             if vcUseRealNames:GetBool() then
                 local gmName = GAMEMODE.GetDeathNoticeEntityName
@@ -1027,6 +1374,15 @@ local function OnNPCKilled( npc, attacker, inflictor, isInput )
     CheckNearbyNPCOnDeath( npc, attacker )
 end
 
+local function OnEntityRemoved( npc )
+    if !npc.NPCVC_Initialized then return end
+
+    local npcClass = npc:GetClass()
+    if npcClass != "rpg_missile" and npcClass != "grenade_ar2" and npcClass != "npc_grenade_bugbait" and npcClass != "npc_grenade_frag" and npcClass != "grenade_helicopter" then return end
+
+    OnNPCKilled( npc )
+end
+
 local function OnPlayerDeath( ply, inflictor, attacker )
     if ignorePlys:GetBool() then return end
 
@@ -1107,6 +1463,33 @@ local function OnServerThink()
                 if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
                     NPCVC:PlayVoiceLine( npc, "taunt" )
                 end
+            end
+        elseif npcClass == "combine_mine" and npc:GetInternalVariable( "m_iMineState" ) == 4 and vcAllowLines_CombatIdle:GetBool() then
+            if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
+                NPCVC:PlayVoiceLine( npc, "taunt" )
+            end
+        elseif npcClass == "rpg_missile" or npcClass == "grenade_ar2" or npcClass == "crossbow_bolt" or npcClass == "hunter_flechette" or npcClass == "npc_grenade_bugbait" then 
+            if npc:GetMoveType() == MOVETYPE_NONE then
+                if !npc.NPCVC_IsKilled then
+                    OnNPCKilled( npc, nil, nil )
+                end
+            elseif vcAllowLines_PanicCond:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+                NPCVC:PlayVoiceLine( npc, "panic" )
+            end
+        elseif npcClass == "prop_combine_ball" then
+            if npc:GetMoveType() == MOVETYPE_NONE then
+                if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
+                    OnNPCKilled( npc, nil, nil )
+                end
+            else
+                local bounceCount = npc:GetInternalVariable( "m_nBounceCount" )
+                local lastCount = npc.NPCVC_LastState
+                if bounceCount != lastCount and lastCount != -1 and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and vcAllowLines_PanicCond:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "panic" )
+                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) and random( 1, 100 ) <= npc.NPCVC_SpeechChance and vcAllowLines_Idle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "idle" )
+                end
+                npc.NPCVC_LastState = bounceCount
             end
         elseif npcClass == "npc_antlion_grub" then
             local curState = npc:GetInternalVariable( "m_State" )
@@ -1227,8 +1610,9 @@ local function OnServerThink()
                     end
 
                     if isPurelyPanic then
-                        if !NPCVC:IsCurrentlySpeaking( npc, "panic", "death" ) then
-                            NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) )
+                        if !NPCVC:IsCurrentlySpeaking( npc, "panic", "death" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
+                            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
+                            if rolledSpeech then NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) ) end
                         end
 
                         if barnacled and !hlsNPCs[ npcClass ] then
@@ -1302,8 +1686,9 @@ local function OnServerThink()
                             end
                         end
 
-                        if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
-                            NPCVC:PlayVoiceLine( npc, "panic" )
+                        if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
+                            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
+                            if rolledSpeech then NPCVC:PlayVoiceLine( npc, "panic" ) end
                         elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
@@ -1490,6 +1875,7 @@ local function OnMapInitialized()
 end
 
 hook.Add( "OnEntityCreated", "NPCSqueakers_OnEntityCreated", OnEntityCreated )
+hook.Add( "EntityRemoved", "NPCSqueakers_OnEntityRemoved", OnEntityRemoved )
 hook.Add( "EntityEmitSound", "NPCSqueakers_OnEntityEmitSound", OnEntityEmitSound )
 hook.Add( "PlayerSpawnedNPC", "NPCSqueakers_OnPlayerSpawnedNPC", OnPlayerSpawnedNPC )
 hook.Add( "OnNPCKilled", "NPCSqueakers_OnNPCKilled", OnNPCKilled )
