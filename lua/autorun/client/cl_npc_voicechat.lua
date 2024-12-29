@@ -1462,11 +1462,11 @@ local function PopulateToolMenu()
             max = 100
         } )
 
-        AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_initvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
             min = 10,
             max = 255
         } )
-        AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_initvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
             min = 10,
             max = 255
         } )
