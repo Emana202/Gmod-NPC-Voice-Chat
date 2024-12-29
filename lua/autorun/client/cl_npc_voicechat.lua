@@ -68,7 +68,7 @@ local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "3
 local vcShowIcon        = CreateClientConVar( "cl_npcvoicechat_showvoiceicon", "1", nil, nil, "If a voice icon should appear above NPC while they're speaking?", 0, 1 )
 local vcScaleIcon       = CreateClientConVar( "cl_npcvoicechat_scaleicon", "1", nil, nil, "If voice icons should scale with their owner's sizes", 0, 1 )
 local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "1", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
-local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "0", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
+local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist", "750", nil, nil, "How close should the NPC be for its voice popup to show up? Set to zero to show up regardless of distance", 0 )
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
 local vcPopupDrawPfp    = CreateClientConVar( "cl_npcvoicechat_popupdrawpfp", "1", nil, nil, "If the NPC's voice popup should draw its profile picture", 0, 1 )
 local vcPopupShiftLeft  = CreateClientConVar( "cl_npcvoicechat_popupshiftleft", "0", nil, nil, "If the NPC's voice popup should shift to the left if it's being drawn offscreen due to lots of other", 0, 1 )
@@ -1462,14 +1462,15 @@ local function PopulateToolMenu()
             max = 100
         } )
 
-        AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_initvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Min Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_min", "The lowest pitch a NPC's voice can get upon spawning", {
             min = 10,
             max = 255
         } )
-        AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_initvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
+        AddSettingsPanel( panel, false, "NumSlider", "Max Voice Pitch", "sv_npcvoicechat_spawnvoicepitch_max", "The highest pitch a NPC's voice can get upon spawning", {
             min = 10,
             max = 255
         } )
+        AddSettingsPanel( panel, false, "CheckBox", "Higher Voice Pitch For Small NPCs", "sv_npcvoicechat_higherpitchforsmallnpcs", "If NPCs with smaller sizes should have a higher voice pitch" )
         
         AddSettingsPanel( panel, false, "NumSlider", "Speak Limit", "sv_npcvoicechat_speaklimit", "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", {
             max = 25
