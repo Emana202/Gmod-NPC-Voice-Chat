@@ -285,9 +285,9 @@ local vcSlightDelay             = CreateConVar( "sv_npcvoicechat_slightdelay", "
 local vcUseRealNames            = CreateConVar( "sv_npcvoicechat_userealnames", "1", cvarFlag, "If NPCs should use their actual names instead of picking random nicknames", 0, 1 )
 local vcKillfeedNick            = CreateConVar( "sv_npcvoicechat_killfeednicks", "1", cvarFlag, "If NPC's killfeed name should be their voicechat nickname", 0, 1 )
 local vcPitchMin                = CreateConVar( "sv_npcvoicechat_initvoicepitch_min", "85", cvarFlag, "The highest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcPitchMax                = CreateConVar( "sv_npcvoicechat_initvoicepitch_max", "130", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
-local vcHighPitchSmallNPCs      = CreateConVar( "sv_npcvoicechat_higherpitchforsmallnpcs", "1", cvarFlag, "If NPCs with smaller sizes should have a higher voice pitch", 0, 1 )
-local vcCensorLines             = CreateConVar( "sv_npcvoicechat_censorcertainlines", "1", cvarFlag, "If enabled, makes certain offensive voicelines to not play", 0, 1 )
+local vcPitchMax                = CreateConVar( "sv_npcvoicechat_initvoicepitch_max", "120", cvarFlag, "The lowest pitch a NPC's voice can get upon spawning", 0, 255 )
+local vcHighPitchSmallNPCs      = CreateConVar( "sv_npcvoicechat_higherpitchforsmallnpcs", "0", cvarFlag, "If NPCs with smaller sizes should have a higher voice pitch", 0, 1 )
+local vcCensorLines             = CreateConVar( "sv_npcvoicechat_censorcertainlines", "0", cvarFlag, "If enabled, makes certain offensive voicelines to not play", 0, 1 )
 local vcSpeakLimit              = CreateConVar( "sv_npcvoicechat_speaklimit", "0", cvarFlag, "Controls the amount of NPCs that can use voicechat at once. Set to zero to disable", 0 )
 local vcLimitAffectsDeath       = CreateConVar( "sv_npcvoicechat_speaklimit_dontaffectdeath", "1", cvarFlag, "If the speak limit shouldn't affect NPCs that are playing their death voiceline", 0, 1 )
 local vcMinSpeechChance         = CreateConVar( "sv_npcvoicechat_minimumspeechchance", "15", cvarFlag, "The minimum value the NPC's random speech chance should be when spawning", 0, 100 )
@@ -1130,7 +1130,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
         end
 
         if locAttacker == npc then
-            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and isSingle ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh", "kill", "taunt" ) then
+            if killLines and ( random( 1, 100 ) <= npc.NPCVC_SpeechChance or ent:IsPlayer() and ( isSingle or random( 1, 3 ) != 1 ) ) and npc.NPCVC_LastValidEnemy == ent and !NPCVC:IsCurrentlySpeaking( npc, "laugh", "kill", "taunt" ) then
                 NPCVC:PlayVoiceLine( npc, ( random( 1, 5 ) == 1 and "laugh" or "kill" ) )
                 continue
             end
@@ -1506,7 +1506,7 @@ local function OnServerThink()
                 end
             else
                 local curState = npc:GetInternalVariable( "m_State" )
-                if random( 1, 100 ) <= npc.NPCVC_SpeechChance then
+                if random( 1, 100 ) <= npc.NPCVC_SpeechChance and random( 1, 3 ) == 1 then
                     if curState == 1 and curState != npc.NPCVC_LastState then
                         NPCVC:PlayVoiceLine( npc, "taunt" )
                     elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
