@@ -5,6 +5,8 @@ local RandomPairs = RandomPairs
 local IsValid = IsValid
 local isentity = isentity
 local SimpleTimer = timer.Simple
+local CreateTimer = timer.Create
+local RemoveTimer = timer.Remove
 local random = math.random
 local randomseed = math.randomseed
 local string_sub = string.sub
@@ -48,199 +50,15 @@ local file_Find = file.Find
 local file_Delete = file.Delete
 local JSONToTable = util.JSONToTable
 local TableToJSON = util.TableToJSON
+local string_StartsWith = string.StartsWith
+local FindByModel = ents.FindByModel
 
 local waterCheckTr = {}
 local nextNPCSoundThink = 0
-local transitionSaveNPCs = {
-    [ "npc_dog" ] = true,
-    [ "npc_alyx" ] = true,
-    [ "npc_barney" ] = true,
-    [ "npc_kleiner" ] = true,
-    [ "npc_breen" ] = true,
-    [ "npc_eli" ] = true,
-    [ "npc_monk" ] = true,
-    [ "npc_gman" ] = true,
-    [ "npc_magnusson" ] = true,
-    [ "npc_mossman" ] = true,
-    [ "npc_odessa" ] = true,
-    [ "monster_gman" ] = true
-}
-local noWepFearNPCs = {
-    [ "npc_alyx" ] = true,
-    [ "npc_barney" ] = true,
-    [ "npc_citizen" ] = true,
-    [ "npc_kleiner" ] = true,
-    [ "npc_mossman" ] = true,
-    [ "npc_eli" ] = true,
-    [ "npc_eli" ] = true,
-    [ "monster_scientist" ] = true
-}
-local dontFearNPCs = {
-    [ "npc_zombie" ] = true,
-    [ "npc_headcrab" ] = true,
-    [ "npc_headcrab_fast" ] = true,
-    [ "npc_headcrab_black" ] = true,
-    [ "npc_fastzombie" ] = true,
-    [ "npc_poisonzombie" ] = true,
-    [ "npc_zombine" ] = true,
-    [ "npc_zombie_torso" ] = true,
-    [ "npc_fastzombie_torso" ] = true
-}
-local nonNPCNPCs = {
-    [ "npc_bullseye" ] = true,
-    [ "npc_enemyfinder" ] = true,
-    [ "npc_furniture" ] = true,
-    [ "controller_energy_ball" ] = true,
-    [ "nihilanth_energy_ball" ] = true,
-    [ "hornet" ] = true,
-    [ "npc_cranedriver" ] = true,
-    [ "cycler_actor" ] = true,
-    [ "npc_launcher" ] = true,
-    [ "npc_puppet" ] = true,
-    [ "obj_vj_bullseye" ] = true,
-    [ "cycler" ] = true,
-    [ "generic_actor" ] = true,
-    [ "npc_vehicledriver" ] = true,
-    [ "monster_furniture" ] = true,
-    [ "animprop_generic" ] = true,
-    [ "animprop_generic_physmodel" ] = true,
-    [ "monster_generic" ] = true,
-    [ "rd_target" ] = true
-}
-local drownNPCs = {
-    [ "npc_headcrab" ] = true,
-    [ "npc_headcrab_black" ] = true,
-    [ "npc_headcrab_fast" ] = true,
-    [ "npc_rollermine" ] = true,
-    [ "npc_antlion" ] = true,
-    [ "npc_antlion_worker" ] = true
-}
-local noStateUseNPCs = {
-    [ "npc_barnacle" ] = true,
-    [ "npc_combinedropship" ] = true,
-    [ "npc_helicopter" ] = true,
-    [ "npc_combinegunship" ] = true,
-    [ "npc_turret_ceiling" ] = true
-}
-local npcIconHeights = {
-    [ "monster_turret" ] = -60,
-    [ "monster_miniturret" ] = -60,
-    [ "npc_barnacle" ] = { 80, -64 },
-    [ "monster_barnacle" ] = { 80, -64 },
-    [ "npc_combine_camera" ] = -70,
-    [ "npc_turret_ceiling" ] = -70,
-    [ "npc_manhack" ] = 24,
-    [ "npc_cscanner" ] = 24,
-    [ "npc_clawscanner" ] = 24,
-    [ "npc_strider" ] = { 275, 50 },
-    [ "monster_houndeye" ] = 58,
-    [ "monster_bullchicken" ] = 58,
-    [ "npc_helicopter" ] = { 275, 90 },
-    [ "monster_apache" ] = { 225, 70 },
-    [ "npc_antlionguard" ] = 150,
-    [ "npc_dog" ] = 128,
-    [ "npc_combinegunship" ] = { 250, 128 },
-    [ "npc_combinedropship" ] = 240,
-    [ "monster_bigmomma" ] = { 175, 180 },
-    [ "monster_gargantua" ] = { 175, 250 },
-    [ "monster_tentacle" ] = 600,
-    [ "monster_nihilanth" ] = 750
-}
-local hlsNPCs = {
-    [ "monster_alien_grunt" ] = true,
-    [ "monster_barnacle" ] = true,
-    [ "monster_nihilanth" ] = true,
-    [ "monster_tentacle" ] = true,
-    [ "monster_alien_slave" ] = true,
-    [ "monster_bigmomma" ] = true,
-    [ "monster_bullchicken" ] = true,
-    [ "monster_gargantua" ] = true,
-    [ "monster_human_assassin" ] = true,
-    [ "monster_babycrab" ] = true,
-    [ "monster_human_grunt" ] = true,
-    [ "monster_leech" ] = true,
-    [ "monster_cockroach" ] = true,
-    [ "monster_houndeye" ] = true,
-    [ "monster_scientist" ] = true,
-    [ "monster_snark" ] = true,
-    [ "monster_zombie" ] = true,
-    [ "monster_headcrab" ] = true,
-    [ "monster_alien_controller" ] = true,
-    [ "monster_barney" ] = true,
-    [ "monster_turret" ] = true,
-    [ "monster_miniturret" ] = true,
-    [ "monster_apache" ] = true,
-    [ "monster_sentry" ] = true
-}
-local defVoiceTypeDirs = { [ "idle" ] = "npcvoicechat/vo/idle", [ "witness" ] = "npcvoicechat/vo/witness", [ "death" ] = "npcvoicechat/vo/death", [ "panic" ] = "npcvoicechat/vo/panic", [ "taunt" ] = "npcvoicechat/vo/taunt", [ "kill" ] = "npcvoicechat/vo/kill", [ "laugh" ] = "npcvoicechat/vo/laugh", [ "assist" ] = "npcvoicechat/vo/assist", [ "fall" ] = "npcvoicechat/vo/fall" }
-local ignoreGagTypes = {
-    [ "death" ] = true,
-    [ "panic" ] = true,
-    [ "laugh" ] = true,
-    [ "witness" ] = true
-}
-
---[[
-local specialMapData = {
-    [ "d1_trainstation_01" ] = {
-        [ "npc_breen" ] = {
-            Pos = {
-                Vector( -4063.904053, -2035.823364, 478.108734 ),
-                Vector( -3890.994629, -695.143372, 211.968521 ),
-            },
-            Volume = 2.25
-        },
-        [ "npc_kleiner" ] = {
-            Pos = Vector( -3274.656494, -292.627411, 56.341728 ),
-            Volume = 0.75
-        }
-    },
-    [ "d1_trainstation_02" ] = {
-        [ "npc_breen" ] = {
-            Pos = {
-                Vector( -3778.909180, -2514.122559, 487.537415 ),
-                Vector( -1995.260010, -1860.380859, 735.659729 ),
-            },
-            Volume = 2.25
-        }
-    },
-    [ "d1_trainstation_03" ] = {
-        [ "npc_breen" ] = {
-            Pos = "prop_flr1tv4_body",
-            Volume = 0.5
-        }
-    },
-    [ "d1_trainstation_05" ] = {
-        [ "npc_eli" ] = {
-            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
-            Volume = 0.5
-        },
-        [ "npc_alyx" ] = {
-            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
-            Volume = 0.33
-        },
-        [ "npc_vortigaunt" ] = {
-            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
-            Volume = 0.1
-        },
-        [ "npc_mossman" ] = {
-            Pos = Vector( -7278.043945, -1299.180054, 110.692078 ),
-            Volume = 0.25
-        }
-    },
-    [ "d1_canals_07" ] = {
-        [ "npc_breen" ] = {
-            Pos = Vector( 10950.773438, 2099.037842, -176.808334 )
-        }
-    }
-}
-]]
-
 local aiDisabled = GetConVar( "ai_disabled" )
 local ignorePlys = GetConVar( "ai_ignoreplayers" )
 
--- Dear god...
-local defaultNames = { "Based Kleiner", "The Real Zeta Player", "Beta", "Generic Name 1", "Ze Uberman", "Q U A N T U M P H Y S I C S", "portable fridge", "Methman456", "i rdm kids for breakfast", "Cheese Adiction Therapist", "private hoovy", "Socks with Sandals", "Solar", "AdamYeBoi", "troll", "de_struction and de_fuse", "de_rumble", "decoymail", "Damian", "BrandontheREDSpy", "Braun", "brent13", "BrokentoothMarch", "BruH", "BudLightVirus", "Call of Putis", "CanadianBeaver", "Cake brainer", "cant scream in space", "CaptGravyBoness", "CaraKing09", "CarbonTugboat", "CastHalo", "cate", "ccdrago56", "cduncan05", "Chancellor_Ant", "Changthunderwang", "Charstorms", "Ch33kCLaper69", "Get Good Get Lmao Box", "Atomic", "Audrey", "Auxometer", "A Wise Author", "Awtrey516", "Aytx", "BabaBooey", "BackAlleyDealerMan", "BalieyeatsPizza", "ballzackmonster", "Banovinski", "bardochib", "BBaluka", "Bean man", "Bear", "Bearman_18", "beeflover100", "Albeon Stormhammer", "Andromedus", "Anilog", "Animus", "Sorry_an_Error_has_Occurred", "I am the Spy", "engineer gaming", "Ze Uberman", "Regret", "Sora", "Sky", "Scarf", "Graves", "bruh moment", "Garrys Mod employee", "i havent eaten in 69 days", "DOORSTUCK89", "PickUp That Can Cop", "Never gonna give you up", "if you are reading this, ur mom gay ", "The Lemon Arsonist", "Cave Johnson", "Chad", "Speedy", "Alan", "Alpha", "Bravo", "Delta", "Charlie", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet", "Kilo", "Lima", "Lina", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-Ray", "Yankee", "Zulu", "Flare", "Brian", "Frank", "Blaze", "Rin", "Bolt", "runthemingesarecoming", "Brute", "Snare", "Matt", "Arc", "VeeVee", "Serv", "Manjaro", "Sentinal", "Night", "Cayde", "Ranger", "Coach", "Bob Ross", "Mossman", "Nova", "drop10kthisisamug2874", "NUCCCLLEEEEEOOOOOOON", "u mad", "TheAdminge", "Trace", "Kelly", "Marauder", "AVATAR", "Scout", "Mirage", "Spark", "Jolt", "Ghost", "Summer", "Breenisgay69", "Dr Breen", "Combino", "Beowulf", "Heavy Weapons Guy", "GodFather", "Cheaple", "Desmond the epic", "Despairaity", "Destroyer_V0", "Devout Buddhist", "DingoGorditas", "DiscoDodgeBall", "Doc Johnson", "Dogmeat Tactical Vest", "Dogboy", "D O I N K", "ThatMW2Squeaker", "EBOI BOI BOI BOI BOI BOI BOI", "Condescending Idiot", "CoolColton947", "CordingWater6", "Cpt_Core", "Crofty", "Crusader", "Ctoycat", "Cyclops", "Daddy_Debuff", "dallas", "DaLocust56", "Danny DeVito", "DaNub2038", "DarkNinjaD", "DarthHighGround", "DarthOobleck", "Dassault Mirage 2000C", "Davidb16", "D4rp_b0y", "Ruzzk1y", "SanicYT948", "sanitter", "Sanity", "Schutzhund", "scipion34", "Scotty2Hotty", "Seltzer", "Senior Cangrejo", "sfingers02", "Sharkgoat", "SharkyShark", "Shawty Like A Melody", "sh00shyb0i", "ShrekYeeter69", "Shrubster", "SirSamTheMan", "skinny peen", "Skulleewag395", "SleepingWarkat", "Sleipnlr", "Small PP Man", "SmortSocks", "Snapsro94", "Snipeshot556", "Snoot", "remember_no_russian", "Res", "ricefouboi", "rickymicdoo", "Rigatoni", "Robo7988143", "Rocketeer097", "Rollinwind", "rolltide10032", "Rome12310", "rushbuild", "mason the numbers what do they mean", "onin ring", "0nyx", "oofiet", "Orlorin_Foolofatook26", "pablo", "Paft_Dunk", "Panther0706", "Patrick", "PD53", "Pedro", "Peel1", "PenaPVP", "Penguan", "pepegonzalez2006", "Pescaxo", "phatty", "Piard", "Pickles", "Pigeon", "PilotJames007", "Pilotlily", "Piratenkapitan", "PixelG", "planewithnocanards", "platypus429", "Plumpotato47", "PM Prayuth", "poop_sock6969", "PollutionDieingPlanet", "Popsicle-Biscuit", "portable fridge", "Potatogamer555", "Prinz Eugen007", "PrivateWings", "PuercoVolador", "Purple Toyota AE87", "Pyromaniac", "B", "Quacker The Ducker", "Quadrapuds", "Obama", "obamas-last-name", "Aria", "0nE", "FluffySkunkBoy", "John117", "Kanye Bear", "NASCAR FAN 48", "Nightengale537", "Painini", "picklface", "Slavic_Chicken", "Snoucher", "Special", "wheatly_crab", "Yuri Kuroyanagi", "Doof", "Doritos Toasted Corn Tortilla Chips", "Doubletimes", "Dragon", "Adrian", "Umbreon-Kun", "Im happy :D", "Im Sad D:", "Dead Meme", "Kohan-Kun", "Juan", "Chunky Joe", "Slyblindfox", "Trump", "Ronald", "Kortex", "Kim Jack Off", "Aimlocked", "KloGuy", "Chucky", "Volcano", "Doge Mint", "JackTheRipper", "Just a Cardboard Box", "~Erim~", "muesli", "Saiko", "aoihitsuji", "Reayr1", "Mekako", "ddaydeath", "Str00kerX", "Yuki", "Rena.", "cOnFuSeD", "terminator YD", "Kylin", "Seki", "Osmund", "Botulism Betty", "miyuki", "Pway pway", "TKO | gag0!", "Styx", "/sng/", "OWO", "Kr@zZy", "c0rsair", "nexcor", "pr3st0", "663", "V0id", "Killing Frenzy", "Campers Death", "You make me Laugh", "killaura", "Violently Happy", "Make my Day", "Pissed Off", "Bloodlust", "b02fof", "Zap!", "Dredd", "Fuzzey", "Bucus", "mokku", "A Professional With Standards", "Archimedes!", "Glorified Toaster with Legs", "Yana", "Your pet turtle", "You smell bad", "You smell nice", "I'm real", "Let's make children", "chen y", "NotDuckie", "De_stroyed", "nabongS", "h8 exam", "Crazii", "i h8 myself", "jowak1n", "beyluta", "natty_the_great", "ernest_aj", "bored", "hambug | buying skins", "Kiwino", "farn", "hezzy", "misty :3", "taFFy", "Kei", "I love you", "Sasucky", "eisoptrophobia.", "Yzui", "VKDrummer", "GDliZy", "Schizo x.O", "Yowza", "Hikari", "Niltf", "Kiruh", "caKuma", "Inkou PM", "I wish i was dead", "iamsleepless", "Hackyou", "Sokiy", "Kairu", "hatihati", "tarumaru", "berthe", "MB295", "Jumo", "kirkimedes", "Souless", "LamZee", "Aya-Chan", "gvek", "El Jägermeister", "ikitakunai", "Meti ", "VyLenT", "AlesTA", "Remi", "FTruby", "Touka_", "henkyyi", "Nitrogen09", "moyazou", "chamaji", "ramjam18", "VyYui", "tsumiki", "__dd", "Jushy", "TANUKANA", "Aeyonna | loving you hurts", "Alux.", "Young Jager", "Exhausted Life", "A E S T H E T I C", "Thomas_", "Ross Scarlet", "sonamed", "kuben", "Loord", "pasha", "Neo", "GoodRifle", "alex", "xF", "tb", "karl", "Virgo", "Savage", "rita", "prom1se", "xiaoe", "karrigan", "ArcadioN", "Friis", "wazorN", "suraNga", "minet", "j$", "zonic H$", "trace", "ave", "Sunde ACEEE", "Maximus", "Snappi", "xone", "luffeb", "katulen", "Strangelet", "AllThatGlitters21", "BreakingNYC", "DancingCrazy351", "fish be like i spendz da sack", "Darkrogue20", "davedays", "DieAussenseiter", "DragonCharlz", "eddysson86", "ef12striker", "EllesGlitterGossip", "esmeedenters", "HeadsUpLisa | Lwoosers", "hotforwords", "Düktor", "IntelExtremeMasters", "Monarch5150", "mouzmovie", "LUlyuo", "NCIXcom", "RayWilliamJohnson", "RubberRoss ", "seductioncoach", "septinho", "soundlyawake", "Blacklegion104 ", "ICANHAZHEADSHOT ", "so4p | Lwoosers", "gg_legol4s3rZ7", "Dert", "HDstarcraft ", "Husky", "h0N123", "Da-MiGhtY 4357", "NetManiac", "Kyu >3<", ">PartiZan<", "K!110grAmm", "SchtandartenFuhrer", "mu1ti-K!ll", "=ZL0Y=", "HeadKilla ==(oo)=>", "dub", "Kara", "Mechano!d", "3v!LKilla", "viz0r", "MiXa", "DiGGeR", "=GRoMoZeKA=", "ZveroBoy", "ahl.", "bds.", "brunk", "ElemenT", "fisker", "goseY", "Potti", "Morda", "n0name| S>Keys B>Knives", "NiTron", "Normal Human", "xXSniper_MainXx", "Left Foot In", "Right Foot Out", "Left Handed", "Calcium", "Dinnerbone", "Terrible Terror", "Shoot Me", "Aquatic Mammal", "Poopy Joe", "Free Stuff?", "Needs More Salt", "Duck Feet", "Impossibly Epic", "Joe Mamma", "Catapult of Pain", "Drunk and Scottish", "Half Life 3", "The Last Chip", "Pete", "Mercedes Benz", "Vergil", "FriskyRisky", "Bad Cop", "PersonCake", "SoundAngels", "StrongChase", "Sultryla", "Switzersu", "TagzRip", "TalentCover", "Telemil", "Warrameha", "MrMuskyHusky", "ImBoosted", "PanzerKommandant|8thPanzer", "johnzeus19", "Dunnionringz", "The Helper", "annajnavarro", "Lévi", "Fat Whale", "God HATES you!", "vintige kratskrag", "Who?", "Demoman Takes Skill!", "DohnJoe", "Santa Claus Schoolgirl", "Botulism Betty", "Straight from botnames.txt!", "Blessed To Moonwalk", "Chris P. Bacon", "Consume your Calcium", "rubbedsaltwound", "Content Quality Control", "SpamCracker", "Alcohol + Poor Life Decisions", "salad", "i dont sleep", "Kritty Kat", "Headshot!", "Mini-Biscuits Rights Activist.", "I'm not gay, but $20 is $20", "Dr. Mantis Toboggan", "The Buttstaber", "2 FAST 4 U", "The Living Lawn Mower ", "Don't Fuckle With Shuckle", "Yolo Swaggins", "Suppository Breadcrumbs", "The Inhuman Scorch", "Honey I healed the Heavy", "Drinking + Driving", "spicy comments", "The Terrible Spicy Tea", "Thomas the Wank Engine", "Special Needs Engineer", "A Strange Festive Newt Gingrich", "A Sexually Attractive Cactus", "Swaghetti Yolonaise", "butt soup ", "Alcoholic Fat Guy", "Afraid Egg", "It's Legal in Japan", "I'm So Meta Even This Acronym.", "Unusual Foppish Boner", "Awkward Cuddle Boner", "A Distinctive lack of YOU!", "The Spanish Inquisition", "A Duck On Quack", "obesity related illness.", "ASS PANCAKES!", "Bodyshots Johnson", "Nein Lives.", "Dispenser (Target Practice)", "Country-Steak:Sauce", "Sock Full of Shame", "An overdose of French Toast", "One Kawaii MotherFucker", "Smokey Joe", "The Spicy Meatball.", "I Eat Toddlers", "Cunning Linguist", "3DayOldTeleportedBread", "Replay", "The Intense Hoovy Main", "?", "About_30_ninjas", "Ithoughtshewaslvl18 ", "404 GF not found  ", "IfIDiedIWasAFK ", "Jimmies Rustler", "go go gadget aimbot ", "Neil, Intergalactic Grandpa", "General Steiner", "Crazy Dewfus", "Sympatriotic", "doge", "Warmachine", "Diarrhea On Wheels", "Roasty my Toasty", "Steve Handjobs", "the hottest cheeto ever, man", "Imagine actually dying to WM1", "Vince makes you say Shamwow", "PyrosAreAssholes", "Hilarious Bread", "poo c", "19 year old virgin", "Parasitic watermelon", "Welcome to Costco", "Sick Marmalade, Grandpa ", "buttsaggington", "Mother Fucking Oedipus", "I wonder what cum taste likes", "Money, Hoes and Spaghetti-O's", "Mister Lister the Sister Fister", "Jonk", "Diet Cocaine", "Suspiciously Slow Scout", "Space Gandhi", "urine for a treat", "Delusional Arsonist", "Yung Micheal", "Old Man of America", "Spam & Heals Inc.", "yes_u_suck", "I_YELL_ALOT", "DroolTool", "A very fat man named Minh", "heavy from team fortress 5", "Cheesus Evangelionist", "Just a noob", "WetHitter", "Unsubscribe", "WeThePizza", "LactoseTheIntolerant", "MagicLOL", "getVACburned", "BeatdownMachine", "Such_A_Noob", "Balloonicorn", "Phosuphi", "BeardNoMore", "CutthroatChicken", "YourNameOnMySword", "BarryMcKackiner", "MyAxeYourFace", "Bagelofdeath", "Window Maker", "Rock8Man", "UsedFood", "beepbeepimajeep", "bitpull ", "PatMaximum", "you snoze you loze", "I_fap_twohanded", "DixonCider", "NoChildSupport", "Don't Shoot I'm a virgin ", "Pvt. Parts ", "BigD_McGee ", "McD'sHashbrown ", "SnackBitesWillRule ", "Stalin's Organ.", "BadUsernameSince2015", "NoDadNotTheBelt", "BrokenBoneBroker", "DontTouchThat", "InfinityLag", "NullPointer ", "FrankTheCrank", "Mexican't ", "HouseOfChards", "Playing TF2 on A Toaster", "noob", "SpawnOfChaos", "I'm a Nokia ", "Solid Steak", "Killavanilla", "Tactical Toast", "OmgMyNameWontFi ", "Does you has? ", "niche one ", "he ded lol", "Testicular Thorsion ", "you_sun_of_a_beach ", "that's DOCTOR noob 4u ", "hoehoehoe", "PonySlaystation ", "suck my clock", "Muffled Fart ", "ClickSwitch", "GarbageRubberBand", "PennyUnwise", "Kacktus ", "Propanetankhank ", "HeyimGey. ", "Lol a shaved donkey", "De_stroyed", "i h8 myself", "eisoptrophobia.", "Respect your mom", "I wish i was dead", "CakeStealer", "KinosaurusRex", "Maximus", "SpyCrab", "MassTenderizer", "ParrotGal75", "Mentlegen Terrorist", "La Baguette Faguette", "Soup Can", "Lewdest Robot", "Hella Thicc", "Foot Lover Berry", "Hell is NOT okay", "unnamed", "Player", "HereComesThePainTrain", "lololol", "Nope.avi", "Snipping Tool", "Fax Machine", "m0tiVACation", "Just a Cardboard Box", "xXDark_LordXx", "expee", "????????", "nWord", "NotAnEngineer", "KidFromSchool", "Phone", "OmqItswOOdy", "canon father", "dart invader", "FreeeeeIpad", "nonuts", "E", "Carl Johnson", "Big Smoke", "CritsAreFair", "A Commie", "Prankster_Gangster", "Dad", "im going to area51", "AliveFace", "CornCakes", "Morgan", "goD", "Scunts_Sux", "Bruh231", "nikolai.thegamer 2019", "Pixels", "Mark", "Jon", "Garfield", "a pay 2 play", "a free 2 play", "yeet", "ESP", "a bunch of 0s and 1s", "Hitscan", "LmaoBox", "I DIE !", "Barny", "Gordon Freeman", "Drunken Wretch", "No", "IDontHaveAName", "PewDiePie", "Water Sheep", "Sandvich", "Mega dumboon", "MetalLegend", "A girl", "LessCrits", "Mario", "Loogi", "Sven", "Joergen", "'Merica fok ye", "Serbia", "Fonsi", "Despacito", "Pussy Memes", "Hail", "Bird", "SuperNatural", "SomeBruh", "This Guy", "Soulfull", "Undead", "Vehicle", "210Hill", "Bush-Dog", "The Wall", "The Bitch", "FishFace", "BFG 9000", "Bushman", "LucksMan", "Totally a human", "Shadows", "Nuclear Fruitcake", "Gold Steel", "scooteroni", "Mr.Poot", "liveMeat", "TalkyFan", "miss appauling", "Blue Man", "Red Man", "Gray Man", "Oblivious Man", "Rebel", "Havana OOONANA", "superguy", "Abraham da great", "George chopdowninnocenttree", "Franklin Deez nutz", "a wizard", "What", "thats nacho cheeze", "lesbian", "Gay", "papa Pete", "SpookyMint", "keegasp00ks", "Shock" }
+--
 
 util.AddNetworkString( "npcsqueakers_playsound" )
 util.AddNetworkString( "npcsqueakers_sndduration" )
@@ -251,6 +69,8 @@ util.AddNetworkString( "npcsqueakers_requestdata" )
 util.AddNetworkString( "npcsqueakers_returndata" )
 util.AddNetworkString( "npcsqueakers_getrenderbounds" )
 util.AddNetworkString( "npcsqueakers_sendrenderbounds" )
+
+--
 
 NPCVC                   = NPCVC or {}
 NPCVC.NickNames         = NPCVC.NickNames or {}
@@ -300,9 +120,8 @@ local vcUseLambdaVoicelines     = CreateConVar( "sv_npcvoicechat_uselambdavoicel
 local vcUseLambdaPfpPics        = CreateConVar( "sv_npcvoicechat_uselambdapfppics", "0", cvarFlag, "If NPCs should use profile pictures from Lambda Players and its addons + modules instead" )
 local vcUseLambdaNicknames      = CreateConVar( "sv_npcvoicechat_uselambdanames", "0", cvarFlag, "If NPCs should use nicknames from Lambda Players and its addons + modules instead" )
 local vcVoiceProfile            = CreateConVar( "sv_npcvoicechat_spawnvoiceprofile", "", cvarFlag, "The Voice Profile the newly created NPC should be spawned with. Note: This will override every player's client option with this one" )
-local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "0", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
+local vcVoiceProfileChance      = CreateConVar( "sv_npcvoicechat_randomvoiceprofilechance", "5", cvarFlag, "The chance the a NPC will use a random available Voice Profile as their voice profile after they spawn" )
 local vcVoiceProfileFallback    = CreateConVar( "sv_npcvoicechat_voiceprofilefallbacks", "0", cvarFlag, "If NPC with a voice profile should fallback to default voicelines if its profile doesn't have a specified voice type in it" )
-local vcCensoringLineMode       = CreateConVar( "sv_npcvoicechat_censoringmode", "0", cvarFlag, "" )
 
 local vcAllowLines_Idle         = CreateConVar( "sv_npcvoicechat_allowlines_idle", "1", cvarFlag, "If NPCs are allowed to play voicelines  while they are not in-combat", 0, 1 )
 local vcAllowLines_CombatIdle   = CreateConVar( "sv_npcvoicechat_allowlines_combatidle", "1", cvarFlag, "If NPCs are allowed to play voicelines while they are in-combat", 0, 1 )
@@ -315,6 +134,17 @@ local vcAllowLines_SpotDanger   = CreateConVar( "sv_npcvoicechat_allowlines_spot
 local vcAllowLines_PanicCond    = CreateConVar( "sv_npcvoicechat_allowlines_panicconds", "1", cvarFlag, "If NPCs are allowed to play voicelines when they're currently in some panic inducing condition, like being on fire or being held by player's gravity gun.", 0, 1 )
 local vcAllowLines_LowHealth    = CreateConVar( "sv_npcvoicechat_allowlines_lowhealth", "1", cvarFlag, "If NPCs are allowed to play voicelines when they are low on health.", 0, 1 )
 
+local defVoiceTypeDirs = {
+    [ "idle" ]      = "npcvoicechat/vo/idle",
+    [ "witness" ]   = "npcvoicechat/vo/witness",
+    [ "death" ]     = "npcvoicechat/vo/death",
+    [ "panic" ]     = "npcvoicechat/vo/panic",
+    [ "taunt" ]     = "npcvoicechat/vo/taunt",
+    [ "kill" ]      = "npcvoicechat/vo/kill",
+    [ "laugh" ]     = "npcvoicechat/vo/laugh",
+    [ "assist" ]    = "npcvoicechat/vo/assist",
+    [ "fall" ]      = "npcvoicechat/vo/fall"
+}
 local vcVoiceTypeDirs = {
     [ "idle" ]      = CreateConVar( "sv_npcvoicechat_snddir_idle", defVoiceTypeDirs[ "idle" ], cvarFlag, "" ),
     [ "death" ]     = CreateConVar( "sv_npcvoicechat_snddir_death", defVoiceTypeDirs[ "death" ], cvarFlag, "" ),
@@ -354,8 +184,8 @@ local function UpdateData( ply )
 
     local names = file_Read( "npcvoicechat/names.json", "DATA" )
     if !names then
-        NPCVC.NickNames = defaultNames
-        file_Write( "npcvoicechat/names.json", TableToJSON( defaultNames ) )
+        NPCVC.NickNames = NPCVC.DefaultNickNames
+        file_Write( "npcvoicechat/names.json", TableToJSON( NPCVC.DefaultNickNames ) )
     else
         NPCVC.NickNames = JSONToTable( names )
     end
@@ -470,304 +300,26 @@ NPCVC.OldFunc_BecomeRagdoll = NPCVC.OldFunc_BecomeRagdoll or nextbotMETA.BecomeR
 
 function nextbotMETA:BecomeRagdoll( dmginfo )
     local ragdoll = NPCVC.OldFunc_BecomeRagdoll( self, dmginfo )
-    if self.IsDrGNextbot and IsValid( ragdoll ) then
-        local sndEmitter = self:GetNW2Entity( "npcsqueakers_sndemitter" )
-        if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
+    if self.IsDrGNextbot and self.NPCVC_Initialized and IsValid( ragdoll ) then
+        local failTime = ( CurTime() + 1 )
+        local timerName = "npcsqueakers_fuckyounextbots" .. self:EntIndex()
+    
+        CreateTimer( timerName, 0, 0, function()
+            if !IsValid( self ) or !IsValid( ragdoll ) or CurTime() >= failTime then RemoveTimer( timerName ) return end  
+    
+            local sndEmitter = self:GetNW2Entity( "npcsqueakers_sndemitter" )
+            if !IsValid( sndEmitter ) then return end
+    
+            sndEmitter:SetSoundSource( ragdoll )
+            RemoveTimer( timerName )
+        end )
     end
     return ragdoll
 end
 
 --
 
-NPCVC.CensoredLines = {
-    [ "npcvc_idle9.mp3" ] = true,
-    [ "npcvc_idle52.mp3" ] = true,
-    [ "npcvc_idle53.mp3" ] = true,
-    [ "npcvc_idle54.mp3" ] = true,
-    [ "npcvc_idle55.mp3" ] = true,
-    [ "npcvc_idle56.mp3" ] = true,
-    [ "npcvc_idle59.mp3" ] = true,
-    [ "npcvc_idle60.mp3" ] = true,
-    [ "npcvc_idle61.mp3" ] = true,
-    [ "npcvc_idle107.mp3" ] = true,
-    [ "npcvc_idle110.mp3" ] = true,
-    [ "npcvc_idle115.mp3" ] = true,
-    [ "npcvc_idle123.mp3" ] = true,
-    [ "npcvc_idle124.mp3" ] = true,
-    [ "npcvc_idle125.mp3" ] = true,
-    [ "npcvc_idle128.mp3" ] = true,
-    [ "npcvc_idle138.mp3" ] = true,
-    [ "npcvc_idle156.mp3" ] = true,
-    [ "npcvc_idle160.mp3" ] = true,
-    [ "npcvc_idle164.mp3" ] = true,
-    [ "npcvc_idle181.mp3" ] = true,
-    [ "npcvc_idle195.mp3" ] = true,
-    [ "npcvc_idle206.mp3" ] = true,
-    [ "npcvc_idle207.mp3" ] = true,
-    [ "npcvc_idle209.mp3" ] = true,
-    [ "npcvc_idle210.mp3" ] = true,
-    [ "npcvc_idle211.mp3" ] = true,
-    [ "npcvc_idle218.mp3" ] = true,
-    [ "npcvc_idle222.mp3" ] = true,
-    [ "npcvc_idle226.mp3" ] = true,
-    [ "npcvc_idle250.mp3" ] = true,
-    [ "npcvc_idle260.mp3" ] = true,
-    [ "npcvc_idle262.mp3" ] = true,
-    [ "npcvc_idle270.mp3" ] = true,
-    [ "npcvc_idle277.mp3" ] = true,
-    [ "npcvc_idle288.mp3" ] = true,
-    [ "npcvc_idle289.mp3" ] = true,
-    [ "npcvc_idle315.mp3" ] = true,
-    [ "npcvc_idle330.mp3" ] = true,
-    [ "npcvc_idle333.mp3" ] = true,
-    [ "npcvc_idle348.mp3" ] = true,
-    [ "npcvc_idle359.mp3" ] = true,
-    [ "npcvc_idle367.mp3" ] = true,
-    [ "npcvc_idle369.mp3" ] = true,
-    [ "npcvc_idle370.mp3" ] = true,
-    [ "npcvc_idle380.mp3" ] = true,
-    [ "npcvc_idle383.mp3" ] = true,
-    [ "npcvc_idle389.mp3" ] = true,
-    [ "npcvc_idle392.mp3" ] = true,
-    [ "npcvc_idle394.mp3" ] = true,
-    [ "npcvc_idle402.mp3" ] = true,
-    [ "npcvc_idle479.mp3" ] = true,
-    [ "npcvc_idle482.mp3" ] = true,
-    [ "npcvc_idle490.mp3" ] = true,
-    [ "npcvc_idle492.mp3" ] = true,
-    [ "npcvc_idle501.mp3" ] = true,
-    [ "npcvc_idle505.mp3" ] = true,
-    [ "npcvc_idle509.mp3" ] = true,
-    [ "npcvc_idle521.mp3" ] = true,
-    [ "npcvc_idle522.mp3" ] = true,
-    [ "npcvc_idle526.mp3" ] = true,
-    [ "npcvc_idle538.mp3" ] = true,
-    [ "npcvc_idle542.mp3" ] = true,
-    [ "npcvc_idle572.mp3" ] = true,
-    [ "npcvc_idle575.mp3" ] = true,
-    [ "npcvc_idle579.mp3" ] = true,
-    [ "npcvc_idle580.mp3" ] = true,
-    [ "npcvc_idle587.mp3" ] = true,
-    [ "npcvc_idle602.mp3" ] = true,
-    [ "npcvc_idle603.mp3" ] = true,
-    [ "npcvc_idle605.mp3" ] = true,
-    [ "npcvc_idle623.mp3" ] = true,
-    [ "npcvc_idle625.mp3" ] = true,
-    [ "npcvc_idle628.mp3" ] = true,
-    [ "npcvc_idle637.mp3" ] = true,
-    [ "npcvc_idle638.mp3" ] = true,
-    [ "npcvc_idle651.mp3" ] = true,
-    [ "npcvc_idle653.mp3" ] = true,
-    [ "npcvc_idle654.mp3" ] = true,
-    [ "npcvc_idle659.mp3" ] = true,
-    [ "npcvc_idle661.mp3" ] = true,
-    [ "npcvc_idle663.mp3" ] = true,
-    [ "npcvc_idle667.mp3" ] = true,
-    [ "npcvc_idle668.mp3" ] = true,
-    [ "npcvc_idle691.mp3" ] = true,
-    [ "npcvc_idle692.mp3" ] = true,
-    [ "npcvc_idle700.mp3" ] = true,
-    [ "npcvc_idle706.mp3" ] = true,
-    [ "npcvc_idle707.mp3" ] = true,
-    [ "npcvc_idle709.mp3" ] = true,
-    [ "npcvc_idle718.mp3" ] = true,
-    [ "npcvc_idle727.mp3" ] = true,
-    [ "npcvc_idle738.mp3" ] = true,
-    [ "npcvc_idle743.mp3" ] = true,
-    [ "npcvc_idle747.mp3" ] = true,
-    [ "npcvc_idle767.mp3" ] = true,
-    [ "npcvc_idle782.mp3" ] = true,
-    [ "npcvc_idle796.mp3" ] = true,
-    [ "npcvc_idle797.mp3" ] = true,
-    [ "npcvc_idle798.mp3" ] = true,
-    [ "npcvc_idle799.mp3" ] = true,
-    [ "npcvc_idle801.mp3" ] = true,
-    [ "npcvc_idle809.mp3" ] = true,
-    [ "npcvc_idle816.mp3" ] = true,
-    [ "npcvc_idle819.mp3" ] = true,
-    [ "npcvc_idle853.mp3" ] = true,
-    [ "npcvc_idle854.mp3" ] = true,
-    [ "npcvc_idle856.mp3" ] = true,
-    [ "npcvc_idle860.mp3" ] = true,
-    [ "npcvc_idle865.mp3" ] = true,
-    [ "npcvc_idle868.mp3" ] = true,
-    [ "npcvc_idle870.mp3" ] = true,
-    [ "npcvc_idle883.mp3" ] = true,
-    [ "npcvc_idle886.mp3" ] = true,
-    [ "npcvc_idle889.mp3" ] = true,
-    [ "npcvc_idle890.mp3" ] = true,
-    [ "npcvc_idle892.mp3" ] = true,
-    [ "npcvc_idle893.mp3" ] = true,
-    [ "npcvc_idle894.mp3" ] = true,
-    [ "npcvc_idle899.mp3" ] = true,
-    [ "npcvc_idle903.mp3" ] = true,
-    [ "npcvc_idle905.mp3" ] = true,
-    [ "npcvc_idle906.mp3" ] = true,
-    [ "npcvc_idle907.mp3" ] = true,
-    [ "npcvc_idle908.mp3" ] = true,
-    [ "npcvc_idle914.mp3" ] = true,
-    [ "npcvc_idle915.mp3" ] = true,
-    [ "npcvc_idle916.mp3" ] = true,
-    [ "npcvc_idle920.mp3" ] = true,
-    [ "npcvc_idle929.mp3" ] = true,
-    [ "npcvc_idle930.mp3" ] = true,
-    [ "npcvc_idle931.mp3" ] = true,
-    [ "npcvc_idle937.mp3" ] = true,
-    [ "npcvc_idle938.mp3" ] = true,
-    [ "npcvc_idle941.mp3" ] = true,
-    [ "npcvc_idle942.mp3" ] = true,
-    [ "npcvc_idle956.mp3" ] = true,
-    [ "npcvc_idle960.mp3" ] = true,
-    [ "npcvc_idle966.mp3" ] = true,
-    [ "npcvc_idle967.mp3" ] = true,
-    [ "npcvc_idle968.mp3" ] = true,
-    [ "npcvc_idle971.mp3" ] = true,
-    [ "npcvc_idle974.mp3" ] = true,
-    [ "npcvc_idle975.mp3" ] = true,
-    [ "npcvc_idle975.mp3" ] = true,
-    [ "npcvc_idle1006.mp3" ] = true,
-    [ "npcvc_idle1010.mp3" ] = true,
-    [ "npcvc_idle1040.mp3" ] = true,
-    [ "npcvc_idle1048.mp3" ] = true,
-    [ "npcvc_idle1087.mp3" ] = true,
-    [ "npcvc_idle1103.mp3" ] = true,
-    [ "npcvc_idle1243.mp3" ] = true,
-    [ "npcvc_idle1276.mp3" ] = true,
-    [ "npcvc_idle1337.mp3" ] = true,
-    [ "npcvc_idle1347.mp3" ] = true,
-    [ "npcvc_idle1368.mp3" ] = true,
-    [ "npcvc_idle1377.mp3" ] = true,
-    [ "npcvc_idle1410.mp3" ] = true,
-    [ "npcvc_idle1423.mp3" ] = true,
-    [ "npcvc_idle1424.mp3" ] = true,
-    [ "npcvc_idle1448.mp3" ] = true,
-    [ "npcvc_idle1452.mp3" ] = true,
-    [ "npcvc_idle1482.mp3" ] = true,
-    [ "npcvc_idle1523.mp3" ] = true,
-    [ "npcvc_idle1537.mp3" ] = true,
-    [ "npcvc_idle1536.mp3" ] = true,
-    [ "npcvc_idle1551.mp3" ] = true,
-    [ "npcvc_idle1553.mp3" ] = true,
-    [ "npcvc_idle1560.mp3" ] = true,
-    [ "npcvc_idle1561.mp3" ] = true,
-
-    [ "npcvc_death222.mp3" ] = true,
-    [ "npcvc_death239.mp3" ] = true,
-    [ "npcvc_death240.mp3" ] = true,
-    [ "npcvc_death243.mp3" ] = true,
-    [ "npcvc_death259.mp3" ] = true,
-    [ "npcvc_death260.mp3" ] = true,
-    [ "npcvc_death261.mp3" ] = true,
-    [ "npcvc_death261.mp3" ] = true,
-    [ "npcvc_death343.mp3" ] = true,
-    [ "npcvc_death362.mp3" ] = true,
-    [ "npcvc_death363.mp3" ] = true,
-    [ "npcvc_death369.mp3" ] = true,
-    [ "npcvc_death378.mp3" ] = true,
-    [ "npcvc_death379.mp3" ] = true,
-    [ "npcvc_death380.mp3" ] = true,
-    [ "npcvc_death388.mp3" ] = true,
-    [ "npcvc_death397.mp3" ] = true,
-    [ "npcvc_death399.mp3" ] = true,
-    [ "npcvc_death413.mp3" ] = true,
-    [ "npcvc_death420.mp3" ] = true,
-    [ "npcvc_death425.mp3" ] = true,
-    [ "npcvc_death428.mp3" ] = true,
-    [ "npcvc_death437.mp3" ] = true,
-    [ "npcvc_death442.mp3" ] = true,
-    [ "npcvc_death443.mp3" ] = true,
-    [ "npcvc_death448.mp3" ] = true,
-    [ "npcvc_death460.mp3" ] = true,
-    [ "npcvc_death465.mp3" ] = true,
-    [ "npcvc_death470.mp3" ] = true,
-    [ "npcvc_death471.mp3" ] = true,
-    [ "npcvc_death472.mp3" ] = true,
-    [ "npcvc_death476.mp3" ] = true,
-    [ "npcvc_death495.mp3" ] = true,
-    [ "npcvc_death509.mp3" ] = true,
-    [ "npcvc_death521.mp3" ] = true,
-    [ "npcvc_death552.mp3" ] = true,
-    [ "npcvc_death680.mp3" ] = true,
-    [ "npcvc_death707.mp3" ] = true,
-    [ "npcvc_death712.mp3" ] = true,
-    [ "npcvc_death716.mp3" ] = true,
-    [ "npcvc_death720.mp3" ] = true,
-    [ "npcvc_death738.mp3" ] = true,
-    [ "npcvc_death740.mp3" ] = true,
-    [ "npcvc_death802.mp3" ] = true,
-
-    [ "npcvc_assist334.mp3" ] = true,
-    [ "npcvc_assist323.mp3" ] = true,
-    [ "npcvc_assist315.mp3" ] = true,
-    [ "npcvc_assist313.mp3" ] = true,
-    [ "npcvc_assist308.mp3" ] = true,
-    [ "npcvc_assist307.mp3" ] = true,
-    [ "npcvc_assist304.mp3" ] = true,
-    [ "npcvc_assist299.mp3" ] = true,
-    [ "npcvc_assist284.mp3" ] = true,
-    [ "npcvc_assist283.mp3" ] = true,
-    [ "npcvc_assist281.mp3" ] = true,
-    [ "npcvc_assist273.mp3" ] = true,
-    [ "npcvc_assist271.mp3" ] = true,
-    [ "npcvc_assist264.mp3" ] = true,
-    [ "npcvc_assist260.mp3" ] = true,
-    [ "npcvc_assist259.mp3" ] = true,
-    [ "npcvc_assist254.mp3" ] = true,
-    [ "npcvc_assist150.mp3" ] = true,
-    [ "npcvc_assist129.mp3" ] = true,
-    [ "npcvc_assist128.mp3" ] = true,
-    [ "npcvc_assist123.mp3" ] = true,
-    [ "npcvc_assist111.mp3" ] = true,
-    [ "npcvc_assist103.mp3" ] = true,
-    [ "npcvc_assist102.mp3" ] = true,
-    [ "npcvc_assist75.mp3" ] = true,
-    [ "npcvc_assist74.mp3" ] = true,
-    [ "npcvc_assist73.mp3" ] = true,
-
-    [ "npcvc_taunt393.mp3" ] = true,
-    [ "npcvc_taunt394.mp3" ] = true,
-    [ "npcvc_taunt395.mp3" ] = true,
-    [ "npcvc_taunt401.mp3" ] = true,
-    [ "npcvc_taunt403.mp3" ] = true,
-    [ "npcvc_taunt409.mp3" ] = true,
-    [ "npcvc_taunt416.mp3" ] = true,
-    [ "npcvc_taunt432.mp3" ] = true,
-    [ "npcvc_taunt433.mp3" ] = true,
-    [ "npcvc_taunt437.mp3" ] = true,
-    [ "npcvc_taunt440.mp3" ] = true,
-    [ "npcvc_taunt467.mp3" ] = true,
-    [ "npcvc_taunt497.mp3" ] = true,
-    [ "npcvc_taunt498.mp3" ] = true,
-    [ "npcvc_taunt518.mp3" ] = true,
-    [ "npcvc_taunt526.mp3" ] = true,
-    [ "npcvc_taunt529.mp3" ] = true,
-    [ "npcvc_taunt558.mp3" ] = true,
-    [ "npcvc_taunt560.mp3" ] = true,
-    [ "npcvc_taunt563.mp3" ] = true,
-    [ "npcvc_taunt573.mp3" ] = true,
-    [ "npcvc_taunt597.mp3" ] = true,
-    [ "npcvc_taunt716.mp3" ] = true,
-    [ "npcvc_taunt846.mp3" ] = true,
-    [ "npcvc_taunt861.mp3" ] = true,
-    [ "npcvc_taunt863.mp3" ] = true,
-    [ "npcvc_taunt866.mp3" ] = true,
-    [ "npcvc_taunt868.mp3" ] = true,
-    [ "npcvc_taunt875.mp3" ] = true,
-    [ "npcvc_taunt883.mp3" ] = true,
-    [ "npcvc_taunt904.mp3" ] = true,
-    [ "npcvc_taunt921.mp3" ] = true,
-    [ "npcvc_taunt927.mp3" ] = true,
-    [ "npcvc_taunt934.mp3" ] = true,
-    [ "npcvc_taunt938.mp3" ] = true,
-    [ "npcvc_taunt941.mp3" ] = true,
-    [ "npcvc_taunt946.mp3" ] = true,
-    [ "npcvc_taunt947.mp3" ] = true,
-    [ "npcvc_taunt954.mp3" ] = true,
-    [ "npcvc_taunt958.mp3" ] = true,
-}
-
---
-
+local callCount = 0
 local function GetVoiceLine( ent, voiceType )
     local voiceTbl
     local voicePfp = NPCVC.VoiceProfiles[ ent.NPCVC_VoiceProfile ]
@@ -780,7 +332,8 @@ local function GetVoiceLine( ent, voiceType )
     if !voiceTbl or #voiceTbl == 0 then return end
 
     local realTime = CurTime()
-    randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime )
+    callCount = ( callCount + 1 )
+    randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime + callCount )
 
     local censorship = vcCensorLines:GetBool()
     for _, voiceLine in RandomPairs( voiceTbl ) do
@@ -805,6 +358,12 @@ local function GetVoiceLine( ent, voiceType )
     return voiceTbl[ random( #voiceTbl ) ]
 end
 
+local ignoreGagTypes = {
+    [ "death" ] = true,
+    [ "panic" ] = true,
+    [ "laugh" ] = true,
+    [ "witness" ] = true
+}
 function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     if !npc.NPCVC_Initialized or npc.NPCVC_IsKilled and voiceType != "death" then return end
     if voiceType != "laugh" and NPCVC:IsCurrentlySpeaking( npc, "laugh" ) then return end
@@ -848,12 +407,21 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
     sndEmitter:Spawn()
 
     local enemyPlyData = npc.NPCVC_EnemyPlayers
-    if !enemyPlyData or CurTime() > enemyPlyData.UpdateTime then
-        enemyPlyData = { UpdateTime = ( CurTime() + 30 ) }
+    for _, ply in ipairs( GetHumans() ) do
+        if NPCVC:GetDispositionOfNPC( npc, ply ) != D_HT then continue end
+        enemyPlyData[ ply ] = true
+    end
 
-        for _, ply in ipairs( GetHumans() ) do
-            if NPCVC:GetDispositionOfNPC( npc, ply ) != D_HT then continue end
-            enemyPlyData[ ply ] = true
+    local addPlayOrig = npc.NPCVC_AdditionalPlay
+    if addPlayOrig then 
+        local origin = addPlayOrig.Pos
+        if istable( origin ) then
+            for k, v in ipairs( origin ) do
+                if !isstring( v ) then continue end
+                origin[ k ] = ents.FindByName( v )[ 1 ]
+            end
+        elseif isstring( origin ) then
+            addPlayOrig.Pos = ents.FindByName( origin )[ 1 ]
         end
     end
 
@@ -870,22 +438,8 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
         StartPos = npc:GetPos(),
         IsDormant = npc:IsDormant(),
         Classname = class,
-        --OverrideVol = npc.NPCVC_OverrideVol
+        AddPlayOrigin = addPlayOrig
     }
-    
-    --[[
-    local overPos = npc.NPCVC_OverridePos
-    if !overPos then
-        overPos = {}
-    elseif isvector( overPos ) then
-        overPos = overPos:ToTable()
-        overPos.Man = 1
-    elseif isstring( overPos ) then
-        overPos = { ents.FindByName( overPos )[ 1 ] }
-        overPos.Man = 2
-    end
-    vcData.OverridePos = overPos
-    ]]
 
     local delayT = 0
     if vcSlightDelay:GetBool() then
@@ -966,38 +520,8 @@ function NPCVC:GetDispositionOfNPC( npc, target )
     return ( dispFunc and dispFunc( npc, target ) or ( target:GetClass() == npc:GetClass() and D_LI or D_HT ) )
 end
 
-local propClasses = {
-    [ "prop_physics" ] = true,
-    [ "grenade_helicopter" ] = true,
-    [ "prop_combine_ball" ] = true,
-    [ "combine_mine" ] = true,
-    [ "rpg_missile" ] = true,
-    [ "item_ammo_ar2" ] = true,
-    [ "item_ammo_ar2_large" ] = true,
-    [ "item_ammo_ar2_altfire" ] = true,
-    [ "item_ammo_crossbow" ] = true,
-    [ "item_box_buckshot" ] = true,
-    [ "item_ammo_357" ] = true,
-    [ "item_ammo_357_large" ] = true,
-    [ "item_healthkit" ] = true,
-    [ "item_healthvial" ] = true,
-    [ "item_battery" ] = true,
-    [ "item_ammo_smg1" ] = true,
-    [ "item_ammo_smg1_large" ] = true,
-    [ "item_ammo_smg1_grenade" ] = true,
-    [ "item_ammo_pistol" ] = true,
-    [ "item_ammo_pistol_large" ] = true,
-    [ "weapon_striderbuster" ] = true,
-    [ "npc_grenade_frag" ] = true,
-    [ "grenade_ar2" ] = true,
-    [ "crossbow_bolt" ] = true,
-    [ "hunter_flechette" ] = true,
-    [ "npc_grenade_bugbait" ] = true,
-    [ "item_rpg_round" ] = true
-}
-
 function NPCVC:IsPhysicsProp( ent )
-    return ( propClasses[ ent:GetClass() ] )
+    return ( NPCVC.PropClasses[ ent:GetClass() ] )
 end
 
 function NPCVC:GetNPCRealName( npc )
@@ -1071,13 +595,10 @@ local function GetNPCProfilePicture( npc )
         if vcUseLambdaPfpPics:GetBool() and Lambdaprofilepictures and #Lambdaprofilepictures != 0 then
             return Lambdaprofilepictures[ random( #Lambdaprofilepictures ) ]
         else
-            local userPfps, pfpPics = NPCVC.UserPFPs
+            local userPfps, pfpPics = NPCVC.UserPFPs, NPCVC.ProfilePictures
             if #userPfps != 0 then
                 pfpPics = ( vcUserPfpsOnly:GetBool() and userPfps or table_Merge( pfpPics, userPfps ) )
-            else
-                pfpPics = NPCVC.ProfilePictures
             end
-
             if #pfpPics != 0 then 
                 return pfpPics[ random( #pfpPics ) ] 
             end
@@ -1120,6 +641,7 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
     local witnessLines = vcAllowLines_WitnessDeath:GetBool()
     local assistLines = vcAllowLines_Assist:GetBool()
     local isSingle = IsSinglePlayer()
+    local isPlyAlly = ( isSingle and NPCVC.PermaAllyNPCs[ ent:GetClass() ] )
 
     for _, npc in ipairs( FindInSphere( entPos, 1500 ) ) do
         if npc == ent or !IsValid( npc ) or !npc.NPCVC_Initialized or npc:GetInternalVariable( "m_lifeState" ) != 0 or ( random( 1, 4 ) != 1 and NPCVC:IsCurrentlySpeaking( npc ) ) then continue end
@@ -1140,14 +662,14 @@ local function CheckNearbyNPCOnDeath( ent, attacker )
                 continue
             end
 
-            local isEnemy = ( npc.NPCVC_LastValidEnemy == ent )
+            local isEnemy = ( npc.NPCVC_LastValidEnemy == ent or isPlyAlly and NPCVC:GetDispositionOfNPC( ent, npc ) == D_HT )
             if !isEnemy and npc:IsNPC() then
                 for _, knownEne in ipairs( npc:GetKnownEnemies() ) do
                     isEnemy = ( knownEne == ent )
                     if isEnemy then break end
                 end
             end
-            if isEnemy and assistLines and !NPCVC:IsCurrentlySpeaking( npc, "assist" ) and NPCVC:GetDispositionOfNPC( npc, locAttacker ) != D_HT and attackPos:DistToSqr( npc:GetPos() ) <= 1000000 then
+            if isEnemy and assistLines and !NPCVC:IsCurrentlySpeaking( npc, "assist" ) and NPCVC:GetDispositionOfNPC( npc, locAttacker ) != D_HT and attackPos:DistToSqr( npc:GetPos() ) <= 589824 then
                 NPCVC:PlayVoiceLine( npc, "assist" )
                 continue
             end
@@ -1180,7 +702,7 @@ local function OnEntityCreated( npc )
         local npcClass = npc:GetClass()
         local whitelistVoice = NPCVC.NPCWhitelist[ npcClass ]
         if !whitelistVoice then
-            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and ( !NPCVC:IsPhysicsProp( npc ) or !vcAllowProps:GetBool() ) and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or nonNPCNPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
+            if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and ( !NPCVC:IsPhysicsProp( npc ) or !vcAllowProps:GetBool() ) and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or NPCVC.NonNPC_NPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
             if npc.Base == "npc_vj_tankg_base" then return end
         end
@@ -1195,13 +717,14 @@ local function OnEntityCreated( npc )
         npc.NPCVC_LastVoiceLine = ""
         npc.NPCVC_IdleVoiceType = ( whitelistVoice != true and whitelistVoice or "idle" )
         npc.NPCVC_NextPanicCheck = 0
+        npc.NPCVC_EnemyPlayers = {}
 
         if npc.LastPathingInfraction then
             npc.NPCVC_VoiceIconHeight = 138
             npc.NPCVC_VoiceVolumeScale = 2
         else
             local scale = ( npc:GetModelScale() or 1 )
-            local height = ( npcIconHeights[ npcClass ] or ( ( npc:OBBMaxs().z + 10 ) * scale )  )
+            local height = ( NPCVC.NPCIconHeights[ npcClass ] or ( ( npc:OBBMaxs().z + 10 ) * scale )  )
             local isTwo = istable( height )
             local isProp = NPCVC:IsPhysicsProp( npc )
 
@@ -1217,7 +740,7 @@ local function OnEntityCreated( npc )
                 if mins and maxs and ( !mins:IsZero() or !maxs:IsZero() ) then
                     local mdlHeight = ( ( abs( mins.z ) + maxs.z ) * scale )
                     if mdlHeight > height then
-                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
+                        npc.NPCVC_VoiceIconHeight = ( NPCVC.NPCIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
                         npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 4.25 )
                     end
                 else
@@ -1230,7 +753,7 @@ local function OnEntityCreated( npc )
                         local mdlHeight = ( ( abs( mins.z ) + maxs.z ) * scale )
                         if mdlHeight <= height or !IsValid( npc ) then return end
 
-                        npc.NPCVC_VoiceIconHeight = ( npcIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
+                        npc.NPCVC_VoiceIconHeight = ( NPCVC.NPCIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
                         npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 3.33 )
                     end )
                 end
@@ -1307,7 +830,7 @@ local function OnEntityCreated( npc )
             }
             StoreEntityModifier( npc, "NPC VoiceChat - NPC's Voice Data", npc.NPCVC_StoredData )
 
-            if mapSavedData and transitionSaveNPCs[ npcClass ] then
+            if mapSavedData and NPCVC.NPCsToTransition[ npcClass ] then
                 SimpleTimer( 0.1, function()
                     if !IsValid( npc ) or npc.NPCVC_CreatedByPlayer or npc.NPCVC_IsDuplicated then return end
 
@@ -1339,17 +862,11 @@ local function OnEntityCreated( npc )
             end
         end
 
-        --[[
-        local mapData = specialMapData[ game.GetMap() ]
+        local mapData = NPCVC.SpecialMapOrigins[ game.GetMap() ]
         if !mapData then return end
             
         mapData = mapData[ npcClass ]
-        if !mapData then return end
-
-        PrintTable( mapData )
-        npc.NPCVC_OverridePos = mapData.Pos
-        npc.NPCVC_OverrideVol = mapData.Volume
-        ]]
+        if mapData then npc.NPCVC_AdditionalPlay = table_Copy( mapData ) end
     end )
 end
 
@@ -1399,8 +916,19 @@ end
 
 local function OnCreateEntityRagdoll( owner, ragdoll )
     if !owner.NPCVC_Initialized then return end
-    local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
-    if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ragdoll ) end
+    
+    local failTime = ( CurTime() + 1 )
+    local timerName = "npcsqueakers_fuckyouohwaitnvm" .. owner:EntIndex()
+
+    CreateTimer( timerName, 0, 0, function()
+        if !IsValid( owner ) or !IsValid( ragdoll ) or CurTime() >= failTime then RemoveTimer( timerName ) return end  
+
+        local sndEmitter = owner:GetNW2Entity( "npcsqueakers_sndemitter" )
+        if !IsValid( sndEmitter ) then return end
+
+        sndEmitter:SetSoundSource( ragdoll )
+        RemoveTimer( timerName )
+    end )
 end
 
 local function OnServerThink()
@@ -1596,7 +1124,7 @@ local function OnServerThink()
                                 isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
                             end
 
-                            if !isPurelyPanic and drownNPCs[ npcClass ] then
+                            if !isPurelyPanic and NPCVC.DrownableNPCs[ npcClass ] then
                                 waterCheckTr.start = npc:WorldSpaceCenter()
                                 waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
                                 waterCheckTr.filter = npc
@@ -1621,7 +1149,7 @@ local function OnServerThink()
                             if rolledSpeech then NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) ) end
                         end
 
-                        if barnacled and !hlsNPCs[ npcClass ] then
+                        if barnacled and !NPCVC.HLS_NPCs[ npcClass ] then
                             SimpleTimer( 0.1, function()
                                 if !IsValid( npc ) then return end
 
@@ -1664,7 +1192,7 @@ local function OnServerThink()
                         if IsValid( curEnemy ) then
                             isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
                             if !isPanicking and !npc.IsVJBaseSNPC and isNPC then
-                                isPanicking = ( IsValid( curEnemy ) and ( noWepFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !dontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
+                                isPanicking = ( IsValid( curEnemy ) and ( NPCVC.NoWeaponNoFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !NPCVC.DontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
                             end
                             if !isPanicking then
                                 isPanicking = ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) )
@@ -1695,7 +1223,7 @@ local function OnServerThink()
                         if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
                             npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
                             if rolledSpeech then NPCVC:PlayVoiceLine( npc, "panic" ) end
-                        elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !hlsNPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !noStateUseNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
+                        elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !NPCVC.HLS_NPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !NPCVC.NoStateUsingNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
                             local curState = npc:GetNPCState()
 
                             if rolledSpeech then
@@ -1812,7 +1340,7 @@ local function OnAcceptInput( ent, input, activator, caller, value )
         return
     end
 
-    if input == "Kill" and hlsNPCs[ ent:GetClass() ] then -- HL:S NPCs only >:(
+    if input == "Kill" and NPCVC.HLS_NPCs[ ent:GetClass() ] then -- HL:S NPCs only >:(
         OnNPCKilled( ent, activator, caller )
     end
 end
@@ -1824,11 +1352,25 @@ end
 
 -- No more mute combine snipers!
 local function OnEntityEmitSound( data )
-    if data.OriginalSoundName != "NPC_Sniper.Die" then return end
+    if data.OriginalSoundName == "NPC_Sniper.Die" then
+        local ent = data.Entity
+        if IsValid( ent ) and ent:GetClass() == "npc_sniper" then
+            NPCVC:PlayVoiceLine( ent, "death", true )
+        end
+    elseif string_StartsWith( data.SoundName, "soul_kicker/memes/meme" ) then -- Soul Kicker (i like it lol)
+        local ent = data.Entity
+        if IsValid( ent ) and ent:GetClass() == "prop_ragdoll" then
+            for _, npc in ipairs( FindByModel( ent:GetModel() ) ) do
+                if npc == ent or !npc.NPCVC_Initialized or !npc:IsMarkedForDeletion() then continue end
+                OnNPCKilled( npc )
 
-    local ent = data.Entity
-    if !IsValid( ent ) or ent:GetClass() != "npc_sniper" then return end
-    NPCVC:PlayVoiceLine( ent, "death", true )
+                local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
+                if IsValid( sndEmitter ) then sndEmitter:SetSoundSource( ent ) end
+
+                break
+            end
+        end
+    end
 end
 
 local function OnServerShutDown()

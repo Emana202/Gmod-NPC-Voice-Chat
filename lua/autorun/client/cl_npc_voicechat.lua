@@ -49,7 +49,6 @@ local PlaySound = surface.PlaySound
 local notification_AddLegacy = notification.AddLegacy
 local vgui_Create = vgui.Create
 local list_Get = list.Get
-local isvector = isvector
 local isentity = isentity
 
 local lambdaPopupX, lambdaPopupY
@@ -72,6 +71,9 @@ local vcPopupDist       = CreateClientConVar( "cl_npcvoicechat_popupdisplaydist"
 local vcPopupFadeTime   = CreateClientConVar( "cl_npcvoicechat_popupfadetime", "2", nil, nil, "Time in seconds needed for popup to fadeout after stopping playing or being out of range", 0, 5 )
 local vcPopupDrawPfp    = CreateClientConVar( "cl_npcvoicechat_popupdrawpfp", "1", nil, nil, "If the NPC's voice popup should draw its profile picture", 0, 1 )
 local vcPopupShiftLeft  = CreateClientConVar( "cl_npcvoicechat_popupshiftleft", "0", nil, nil, "If the NPC's voice popup should shift to the left if it's being drawn offscreen due to lots of other", 0, 1 )
+
+local vcPopupOffsetX    = CreateClientConVar( "cl_npcvoicechat_popupoffset_x", "0", nil, nil, "The X (width) offset of voice popup", -ScrW(), ScrW() )
+local vcPopupOffsetY    = CreateClientConVar( "cl_npcvoicechat_popupoffset_y", "0", nil, nil, "The Y (height) offset of voice popup", -ScrH(), ScrH() )
 
 local vcPopupColorR     = CreateClientConVar( "cl_npcvoicechat_popupcolor_r", "0", nil, nil, "The red color of voice popup when the NPC is using it", 0, 255 )
 local vcPopupColorG     = CreateClientConVar( "cl_npcvoicechat_popupcolor_g", "255", nil, nil, "The green color of voice popup when the NPC is using it", 0, 255 )
@@ -133,7 +135,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
     local ent = vcData.Emitter
     if !IsValid( ent ) then return end
 
-    local callIndex = false
+    local addCallData
     local sndName = "sound/" .. sndDir
     local sndFlags = "noplay" .. ( is3D and "3d" or "" )
 
@@ -146,29 +148,32 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             return
         end
 
-        --[[
-        local forcePos, overridePos = vcData.OverridePos
-        if forcePos then 
-            local man = forcePos.Man
-            if !man then 
-                if !callIndex then
-                    for i = 2, #forcePos do
-                        callIndex = i
-                        PlayFile( sndName, sndFlags, SoundCallback )
-                    end
-                    
-                    overridePos = forcePos[ 1 ]
+        local specData, playOrigin = vcData.AddPlayOrigin
+        local volMult = vcData.VolumeMult
+
+        if specData then
+            local origin = specData.Pos
+            local newVol = specData.Volume
+            
+            if istable( origin ) then
+                if !addCallData then
+                    addCallData = 1
+                    for i = 1, #origin do PlayFile( sndName, sndFlags, SoundCallback ) end
                 else
-                    overridePos = forcePos[ callIndex ]
+                    playOrigin = origin[ addCallData ]
+                    if newVol then volMult = ( volMult * newVol ) end
+                    addCallData = ( addCallData + 1 )
                 end
-            elseif man == 1 then
-                overridePos = Vector( forcePos[ 1 ], forcePos[ 2 ], forcePos[ 3 ] )
-            elseif man == 2 then
-                local ent = forcePos[ 1 ]
-                overridePos = ( IsValid( ent ) and ent or nil )
+            else
+                if !addCallData then
+                    addCallData = origin
+                    PlayFile( sndName, sndFlags, SoundCallback )
+                else
+                    playOrigin = addCallData
+                    if newVol then volMult = ( volMult * newVol ) end
+                end
             end
         end
-        ]]
 
         local sndLength = snd:GetLength()
         if sndLength <= 0 or !IsValid( ent ) then
@@ -183,7 +188,6 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
         local playRate = ( vcData.Pitch / 100 )
         snd:SetPlaybackRate( playRate )
 
-        local volMult = vcData.VolumeMult
         snd:SetVolume( !vcEnabled:GetBool() and 0 or ( vcPlayVol:GetFloat() * volMult ) )
         snd:Set3DFadeDistance( vcPlayDist:GetInt() * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ), 0 )
 
@@ -193,8 +197,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
         NPCVC.SoundEmitters[ #NPCVC.SoundEmitters + 1 ] = {
             Entity = ent,
             Sound = snd,
-            --OverridePos = overridePos,
-            --OverrideVol = vcData.OverrideVol,
+            PlayOrigin = playOrigin,
             LastPlayPos = playPos,
             VolumeMult = volMult,
             Is3D = is3D,
@@ -209,7 +212,16 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             voicePopup.Entity = ent
             voicePopup.Sound = snd
             voicePopup.LastPlayPos = playPos
-        else
+
+            if playOrigin then
+                local origTbl = voicePopup.PlayOrigin
+                if !origTbl then
+                    voicePopup.PlayOrigin = { playOrigin }
+                else
+                    origTbl[ #origTbl + 1 ] = playOrigin
+                end
+            end
+        elseif !playOrigin then
             local pfpPic, pfpMat = vcData.ProfilePicture
             if pfpPic then
                 pfpMat = NPCVC.CachedMaterials[ pfpPic ]
@@ -242,7 +254,6 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
                 Nick = nickName,
                 Entity = ent,
                 Sound = snd,
-                --OverridePos = overridePos,
                 LastPlayPos = playPos,
                 ProfilePicture = pfpMat,
                 VoiceVolume = 0,
@@ -345,8 +356,16 @@ local function UpdateSounds()
         end
 
         if enabled then
+            local playOrigin = sndData.PlayOrigin
+            if playOrigin and isentity( playOrigin ) and !IsValid( playOrigin ) then
+                playOrigin = nil
+                sndData.PlayOrigin = playOrigin
+            end
+
             local lastPos = sndData.LastPlayPos
-            if IsValid( srcEnt ) then
+            if playOrigin then
+                lastPos = ( !isentity( playOrigin ) and playOrigin or playOrigin:GetPos() )
+            elseif IsValid( srcEnt ) then
                 sndData.IsDormant = srcEnt:IsDormant()
                 
                 if !sndData.IsDormant then
@@ -361,20 +380,11 @@ local function UpdateSounds()
                 end
             end
 
-
-            local volMult = sndData.VolumeMult
-            --[[
-            local overPos = sndData.OverridePos
-            if overPos and ( isvector( overPos ) or IsValid( overPos ) ) and curPos:DistToSqr( lastPos ) > 1048576 then
-                lastPos = ( isentity( overPos ) and overPos:GetPos() or overPos )
-                volMult = ( sndData.OverrideVol or volMult )
-            end
-            ]]
-
             if isGlobal then
                 snd:SetVolume( volume )
                 snd:Set3DEnabled( false )
             else
+                local volMult = sndData.VolumeMult
                 local sndVol = ( volume * volMult )
 
                 local is3D = sndData.Is3D
@@ -401,12 +411,20 @@ local function DrawVoiceIcons()
     for _, sndData in ipairs( NPCVC.SoundEmitters ) do
         if sndData.PlayTime then continue end
 
-        local ang = EyeAngles()
-        ang:RotateAroundAxis( ang:Up(), -90 )
-        ang:RotateAroundAxis( ang:Forward(), 90 )
-
+        local pos = sndData.LastPlayPos
         local height = sndData.IconHeight
-        local pos = ( sndData.LastPlayPos + vector_up * height )
+        local playOrig = sndData.PlayOrigin
+        if playOrig then 
+            if isentity( playOrig ) then
+                if !IsValid( playOrig ) then continue end
+                pos =  playOrig:GetPos()
+            else
+                pos =  playOrig
+            end
+            height = ( height / 3 )
+        end
+        pos = ( pos + vector_up * height )
+
         local scale = max( 0.66, 1 * ( vcScaleIcon:GetBool() and max( 1, ( height / 80 ) ) or 1 ) )
         if scale > 1 then 
             local ent = sndData.Entity
@@ -417,7 +435,10 @@ local function DrawVoiceIcons()
                 end
             end 
         end
-        --if sndData.OverridePos and EyePos():DistToSqr( pos ) > 1048576 then continue end
+
+        local ang = EyeAngles()
+        ang:RotateAroundAxis( ang:Up(), -90 )
+        ang:RotateAroundAxis( ang:Forward(), 90 )
 
         Start3D2D( pos, ang, scale )
             surface_SetDrawColor( 255, 255, 255 )
@@ -439,7 +460,6 @@ local function DrawVoiceChat()
     local curPos = EyePos()
     local fadeoutTime = vcPopupFadeTime:GetFloat()
     local displayDist = vcPopupDist:GetInt()
-    displayDist = ( displayDist * displayDist )
     
     local realTime = RealTime()
     local timeOffset = 0
@@ -457,22 +477,30 @@ local function DrawVoiceChat()
             end
         end
         
-        local ent = vcData.Entity
         local lastPos = vcData.LastPlayPos
+        local ent = vcData.Entity
         if IsValid( ent ) then 
             local srcEnt = GetSoundSource( ent )
             if IsValid( srcEnt ) and !srcEnt:IsDormant() then
                 lastPos = srcEnt:GetPos()
-                vcData.LastPlayPos = lastPos
             end
         end
-
-        --[[
-        local overPos = vcData.OverridePos
-        if overPos and ( isvector( overPos ) or IsValid( overPos ) ) and curPos:DistToSqr( lastPos ) > 1048576 then
-            lastPos = ( isentity( overPos ) and overPos:GetPos() or overPos )
+        
+        local playOrigin = vcData.PlayOrigin
+        if playOrigin then
+            for k, origin in ipairs( playOrigin ) do
+                if isentity( origin ) then 
+                    if !IsValid( origin ) then
+                        playOrigin[ k ] = nil
+                        continue
+                    end
+                    origin = origin:GetPos()
+                end
+                if lastPos and curPos:DistToSqr( origin ) >= curPos:DistToSqr( lastPos ) then continue end
+                lastPos = origin
+            end
         end
-        ]]
+        vcData.LastPlayPos = lastPos
 
         local sndVol = 0
         local snd = vcData.Sound
@@ -481,7 +509,13 @@ local function DrawVoiceChat()
             local leftChan, rightChan = snd:GetLevel()
             sndVol = ( ( leftChan + rightChan ) * 0.5 )
 
-            if displayDist == 0 or curPos:DistToSqr( lastPos ) <= displayDist then
+            local showDist = displayDist
+            local volMult = vcData.VolumeMult
+            if volMult > 1 then
+                showDist = ( showDist * max( 1, volMult / 2 ) )
+            end
+
+            if displayDist == 0 or curPos:Distance( lastPos ) <= showDist then
                 vcData.LastPlayTime = realTime
 
                 if vcData.FirstDisplayTime == 0 then
@@ -509,7 +543,7 @@ local function DrawVoiceChat()
     end
 
     if !canDrawSomething then return end
-    local drawX, drawY = ( scrSizeW - 298 ), ( scrSizeH - 142 )
+    local drawX, drawY = ( scrSizeW - 298 + vcPopupOffsetX:GetInt() ), ( scrSizeH - 142 + vcPopupOffsetY:GetInt() )
 
     local plyPopups = g_VoicePanelList
     if ispanel( plyPopups ) then drawY = ( drawY - ( 44 * #plyPopups:GetChildren() ) ) end
@@ -1334,6 +1368,9 @@ local function PopulateToolMenu()
         end
         
         local descText = "ConVar: " .. convar
+        local defVal = GetConVar( convar ):GetDefault()
+        descText = descText .. "\nDefault Value: " .. ( type == "CheckBox" and ( defVal == "1" and "True" or "False" ) or defVal )
+
         if helpText then descText = helpText .. "\n" .. descText end
         ColoredControlHelp( client, panel, descText ) 
 
@@ -1370,6 +1407,16 @@ local function PopulateToolMenu()
         AddSettingsPanel( panel, true, "CheckBox", "Scale Voice Icon", "cl_npcvoicechat_scaleicon", "If voice icons should scale with their owner's sizes" )
         AddSettingsPanel( panel, true, "CheckBox", "Display Voice Popups", "cl_npcvoicechat_showpopups", "If a voicechat popup similar to real player one should display while NPC is using voicechat" )
         AddSettingsPanel( panel, true, "CheckBox", "Draw Popup Profile Picture", "cl_npcvoicechat_popupdrawpfp", "If the NPC's voice popup should draw its profile picture" )
+
+        AddSettingsPanel( panel, true, "NumSlider", "Popup X Offset (Width)", "cl_npcvoicechat_popupoffset_x", "The X (width) offset of voice popup", {
+            min = -ScrW(),
+            max = ScrW(),
+        } )
+        AddSettingsPanel( panel, true, "NumSlider", "Popup Y Offset (Height)", "cl_npcvoicechat_popupoffset_y", "The Y (height) offset of voice popup", {
+            min = -ScrH(),
+            max = ScrH(),
+        } )
+
         AddSettingsPanel( panel, true, "CheckBox", "Shift Popup To Left If Offscreen", "cl_npcvoicechat_popupshiftleft", "If the NPC's voice popup should shift to the left if it's being drawn offscreen due to lots of other" )
 
         AddSettingsPanel( panel, true, "NumSlider", "Popup Display Range", "cl_npcvoicechat_popupdisplaydist", "How close should you be to the the NPC in order for its voice popup to display. Set to zero to draw regardless of range", {
