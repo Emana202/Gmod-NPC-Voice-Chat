@@ -24,6 +24,7 @@ local table_Merge = table.Merge
 local table_Count = table.Count
 local table_RemoveByValue = table.RemoveByValue
 local max = math.max
+local min = math.min
 local GetConVar = GetConVar
 local RoundedBox = draw.RoundedBox
 local DrawText = draw.DrawText
@@ -425,7 +426,7 @@ local function DrawVoiceIcons()
         end
         pos = ( pos + vector_up * height )
 
-        local scale = max( 0.66, 1 * ( vcScaleIcon:GetBool() and max( 1, ( height / 80 ) ) or 1 ) )
+        local scale = max( 0.5, 1 * ( vcScaleIcon:GetBool() and ( height / 80 ) or 1 ) )
         if scale > 1 then 
             local ent = sndData.Entity
             if IsValid( ent ) then
@@ -512,7 +513,9 @@ local function DrawVoiceChat()
             local showDist = displayDist
             local volMult = vcData.VolumeMult
             if volMult > 1 then
-                showDist = ( showDist * max( 1, volMult / 2 ) )
+                showDist = ( showDist * max( 1, volMult / 1.75 ) )
+            elseif volMult < 1 then
+                showDist = ( showDist * min( 1, volMult * 1.25 ) )
             end
 
             if displayDist == 0 or curPos:Distance( lastPos ) <= showDist then

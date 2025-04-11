@@ -12,7 +12,6 @@ local randomseed = math.randomseed
 local string_sub = string.sub
 local string_find = string.find
 local string_Explode = string.Explode
-local Clamp = math.Clamp
 local min = math.min
 local abs = math.abs
 local table_Empty = table.Empty
@@ -382,6 +381,7 @@ function NPCVC:PlayVoiceLine( npc, voiceType, dontDeleteOnRemove, isInput )
 
     local class = npc:GetClass()
     if NPCVC.NPCBlacklist[ class ] then return end
+    if class == "monster_human_assassin" and IsValid( npc:GetEnemy() ) and ( voiceType == "taunt" or voiceType == "idle" ) then return end
 
     local oldEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
     if !NPCVC.TalkingNPCs[ oldEmitter ] and ( voiceType != "death" or !vcLimitAffectsDeath:GetBool() ) then
@@ -730,8 +730,11 @@ local function OnEntityCreated( npc )
 
             npc.NPCVC_VoiceIconHeight = ( isTwo and height[ 2 ] or height )
 
-            local volScale = ( abs( isTwo and height[ 1 ] or height ) / ( isProp and 40 or 72 ) )
-            if !isProp then volScale = Clamp( volScale, 0.66, 3.33 ) end
+            local volScale = ( abs( isTwo and height[ 1 ] or height ) / ( isProp and 40 or 80 ) )
+            if !isProp then
+                volScale = min( volScale, 3.33 )
+                if volScale < 0.5 then volScale = volScale * 1.25 end
+            end
             npc.NPCVC_VoiceVolumeScale = volScale
 
             if !isTwo then
@@ -741,7 +744,7 @@ local function OnEntityCreated( npc )
                     local mdlHeight = ( ( abs( mins.z ) + maxs.z ) * scale )
                     if mdlHeight > height then
                         npc.NPCVC_VoiceIconHeight = ( NPCVC.NPCIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
-                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 4.25 )
+                        npc.NPCVC_VoiceVolumeScale = min( ( abs( mdlHeight ) / 80 ), 4.25 )
                     end
                 else
                     net.Start( "npcsqueakers_getrenderbounds" )
@@ -754,7 +757,7 @@ local function OnEntityCreated( npc )
                         if mdlHeight <= height or !IsValid( npc ) then return end
 
                         npc.NPCVC_VoiceIconHeight = ( NPCVC.NPCIconHeights[ npcClass ] or ( mdlHeight + 10 ) )
-                        npc.NPCVC_VoiceVolumeScale = Clamp( ( abs( mdlHeight ) / 72 ), 0.66, 3.33 )
+                        npc.NPCVC_VoiceVolumeScale = min( ( abs( mdlHeight ) / 80 ), 3.33 )
                     end )
                 end
             end
@@ -1216,7 +1219,7 @@ local function OnServerThink()
 
                             if hintDang then
                                 local hintOwner = hintDang.owner
-                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or IsValid( hintOwner ) and hintOwner != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
+                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or IsValid( hintOwner ) and hintOwner != npc and hintOwner:GetOwner() != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
                             end
                         end
 
