@@ -83,7 +83,7 @@ NPCVC.NPCWhitelist      = NPCVC.NPCWhitelist or {}
 NPCVC.TalkingNPCs       = NPCVC.TalkingNPCs or {}
 NPCVC.MapTransitionNPCs = NPCVC.MapTransitionNPCs or nil
 NPCVC.CachedNPCPfps     = {}
-NPCVC.LastUsedLines     = NPCVC.LastUsedLines or {}
+-- NPCVC.LastUsedLines     = NPCVC.LastUsedLines or {}
 
 file.CreateDir( "npcvoicechat" )
 
@@ -343,7 +343,8 @@ local function GetVoiceLine( ent, voiceType )
             -- print( voiceFile )
             continue
         end
-
+        
+        /*
         local useTime = NPCVC.LastUsedLines[ voiceFile ]
         if useTime then
             if realTime < useTime then continue end
@@ -351,7 +352,7 @@ local function GetVoiceLine( ent, voiceType )
         else
             NPCVC.LastUsedLines[ voiceFile ] = ( realTime + 1800 )
         end
-
+        */
         return voiceLine
     end
     return voiceTbl[ random( #voiceTbl ) ]
@@ -934,6 +935,402 @@ local function OnCreateEntityRagdoll( owner, ragdoll )
     end )
 end
 
+local function OnNPCThink( npc, curTime )
+    if npc.IsDoomNPC then 
+        if npc:Health() <= 0 then 
+            if !npc.NPCVC_IsKilled then OnNPCKilled( npc, nil, nil ) end
+            return
+        elseif npc.NPCVC_IsKilled then
+            npc.NPCVC_IsKilled = false
+        end
+    end
+
+    // HL1 Leech
+    local npcClass = npc:GetClass()
+    if npcClass == "monster_leech" and npc:GetInternalVariable( "m_takedamage" ) == 0 then
+        return
+    end
+
+    local canIdleSpeak = ( curTime >= npc.NPCVC_NextIdleSpeak )
+    if canIdleSpeak then
+        npc.NPCVC_NextIdleSpeak = ( curTime + random( 0, 15 ) )
+    end
+
+    // HL2 Floor Turret
+    if npcClass == "npc_turret_floor" then 
+        local selfDestructing = npc:GetInternalVariable( "m_bSelfDestructing" )
+        if !selfDestructing then 
+            local curState = npc:GetNPCState()
+            local lastState = npc.NPCVC_LastState
+            if curState != lastState then
+                if lastState == NPC_STATE_DEAD and npc:IsPlayerHolding() and vcAllowLines_Assist:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "assist" )
+                elseif curState == NPC_STATE_DEAD and vcAllowLines_SpotDanger:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "panic" )
+                elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) then
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
+                end
+            end
+            npc.NPCVC_LastState = curState
+
+            local curEnemy = npc:GetEnemy()
+            local lastEnemy = npc.NPCVC_LastEnemy
+            if curEnemy != lastEnemy and IsValid( curEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "taunt" )
+            end
+            npc.NPCVC_LastEnemy = curEnemy
+        elseif !npc.NPCVC_InPanicState then
+            npc.NPCVC_InPanicState = true
+
+            if vcAllowLines_PanicCond:GetBool() then
+                SimpleTimer( Rand( 0.8, 1.25 ), function()
+                    if !IsValid( npc ) then return end
+                    NPCVC:PlayVoiceLine( npc, "panic" )
+                end )
+
+                SimpleTimer( Rand( 2, 3.5 ), function()
+                    if !IsValid( npc ) then return end
+                    OnNPCKilled( npc )
+                end )
+            end
+        end
+
+        return 
+    end
+    
+    // Rollermine
+    if npcClass == "npc_rollermine" and IsValid( npc:GetInternalVariable( "m_hVehicleStuckTo" ) ) and vcAllowLines_CombatIdle:GetBool() then
+        if canIdleSpeak then 
+            if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
+                NPCVC:PlayVoiceLine( npc, "taunt" )
+            end
+        end
+        
+        return 
+    end
+    
+    // Combine Hopper Mine
+    if npcClass == "combine_mine" and npc:GetInternalVariable( "m_iMineState" ) == 4 and vcAllowLines_CombatIdle:GetBool() then
+        if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
+            NPCVC:PlayVoiceLine( npc, "taunt" )
+        end
+
+        return
+    end
+    
+    // Projectiles(son😭😭😭)
+    if npcClass == "rpg_missile" or npcClass == "grenade_ar2" or npcClass == "crossbow_bolt" or npcClass == "hunter_flechette" or npcClass == "npc_grenade_bugbait" then 
+        if npc:GetMoveType() == MOVETYPE_NONE then
+            if !npc.NPCVC_IsKilled then
+                OnNPCKilled( npc, nil, nil )
+            end
+        elseif vcAllowLines_PanicCond:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
+            NPCVC:PlayVoiceLine( npc, "panic" )
+        end
+
+        return
+    end
+    
+    // Combine AR2 Ball(folk😭😭😭😭)
+    if npcClass == "prop_combine_ball" then
+        if npc:GetMoveType() == MOVETYPE_NONE then
+            if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
+                OnNPCKilled( npc, nil, nil )
+            end
+        else
+            local bounceCount = npc:GetInternalVariable( "m_nBounceCount" )
+            local lastCount = npc.NPCVC_LastState
+            if bounceCount != lastCount and lastCount != -1 and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and vcAllowLines_PanicCond:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "panic" )
+            elseif canIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) and random( 1, 100 ) <= npc.NPCVC_SpeechChance and vcAllowLines_Idle:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "idle" )
+            end
+            npc.NPCVC_LastState = bounceCount
+        end
+
+        return
+    end
+    
+    // Antlion Grub
+    if npcClass == "npc_antlion_grub" then
+        local curState = npc:GetInternalVariable( "m_State" )
+
+        if npc:GetInternalVariable( "m_takedamage" ) == 0 then
+            if !npc.NPCVC_IsKilled then
+                OnNPCKilled( npc, nil, nil )
+            end
+        else
+            local curState = npc:GetInternalVariable( "m_State" )
+            if random( 1, 100 ) <= npc.NPCVC_SpeechChance and random( 1, 3 ) == 1 then
+                if curState == 1 and curState != npc.NPCVC_LastState then
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
+                elseif canIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
+                    NPCVC:PlayVoiceLine( npc, ( curState == 1 and "taunt" or "idle" ) )
+                end
+            end
+
+            npc.NPCVC_LastState = curState
+        end
+
+        return
+    end
+
+    // Combine Ceiling Camera
+    if npcClass == "npc_combine_camera" then
+        if npc:GetInternalVariable( "m_takedamage" ) == 2 then
+            local lookTarget = npc:GetInternalVariable( "m_hEnemyTarget" )
+            local lastTarget = npc.NPCVC_LastEnemy
+            local isAngry = npc:GetInternalVariable( "m_bAngry" )
+
+            if lookTarget != lastTarget and IsValid( lookTarget ) or isAngry and isAngry != npc.NPCVC_LastState then 
+                if isAngry and vcAllowLines_CombatIdle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
+                elseif vcAllowLines_Idle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "idle" )
+                end
+            end
+
+            if npc:GetInternalVariable( "m_bActive" ) and IsValid( lookTarget ) and canIdleSpeak and random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
+                if IsValid( lookTarget ) and isAngry and vcAllowLines_CombatIdle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "taunt" )
+                elseif vcAllowLines_Idle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "idle" )
+                end
+            end
+
+            npc.NPCVC_LastEnemy = lookTarget
+            npc.NPCVC_LastState = isAngry
+        elseif npc.NPCVC_LastState != -1 then
+            npc.NPCVC_LastState = -1
+            if vcAllowLines_Death:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "death" )
+            end
+        end
+
+        return
+    end
+
+    local curEnemy = NPCVC:GetEnemyOfNPC( npc )
+    local rolledSpeech = ( random( 1, 100 ) <= npc.NPCVC_SpeechChance )
+
+    local lastEnemy = npc.NPCVC_LastEnemy
+    npc.NPCVC_LastEnemy = curEnemy
+
+    local lastSeenTime = npc.NPCVC_LastSeenEnemyTime
+    if IsValid( curEnemy ) then 
+        npc.NPCVC_LastValidEnemy = curEnemy
+
+        if npc.NPCVC_LastSeenEnemyTime == 0 or npc:Visible( curEnemy ) then 
+            npc.NPCVC_LastSeenEnemyTime = curTime 
+        end
+    else
+        npc.NPCVC_LastSeenEnemyTime = 0
+    end
+
+    // Sanic Nextbots
+    if npc.LastPathingInfraction then
+        local isVisible = false
+        if !IsValid( curEnemy ) then
+            npc.NPCVC_LastSeenEnemyTime = 0
+        elseif npc:GetRangeSquaredTo( curEnemy ) <= 1000000 and npc:Visible( curEnemy ) then
+            isVisible = true
+            npc.NPCVC_LastSeenEnemyTime = curTime
+        end
+
+        if rolledSpeech then
+            if lastSeenTime == 0 and isVisible and vcAllowLines_SpotEnemy:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "taunt" )
+            elseif canIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
+                if ( curTime - npc.NPCVC_LastSeenEnemyTime ) <= 5 and IsValid( curEnemy ) then
+                    if vcAllowLines_CombatIdle:GetBool() then
+                        NPCVC:PlayVoiceLine( npc, "taunt" )
+                    end
+                elseif vcAllowLines_Idle:GetBool() then
+                    NPCVC:PlayVoiceLine( npc, "idle" )
+                end
+            end
+        end
+
+        return
+    end
+        
+    local lifeState = npc:GetInternalVariable( "m_lifeState" )
+    if lifeState != 0 then 
+         // Combine Gunship/Hunter Helicopter
+        if ( npcClass == "npc_combinegunship" or npcClass == "npc_helicopter" ) and !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
+            NPCVC:PlayVoiceLine( npc, "death", true )
+        end
+
+        return
+    end
+
+    local isNPC = npc:IsNPC()
+    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or isNPC and npc:GetNPCState() == NPC_STATE_PRONE )
+    local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
+    local stopSpeech = ( rolledSpeech == true )
+
+    if isPurelyPanic then
+        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or isNPC and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 ) )
+
+        if !isPurelyPanic and isNPC then
+            local curSched = ( npc:GetCurrentSchedule() + 1000000000 )
+            isPurelyPanic = ( curSched == GetScheduleID( "SCHED_ANTLION_FLIP" ) or curSched == GetScheduleID( "SCHED_COMBINE_BUGBAIT_DISTRACTION" ) )
+
+            if !isPurelyPanic then 
+                local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
+                isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
+            end
+
+            if !isPurelyPanic and NPCVC.DrownableNPCs[ npcClass ] then
+                waterCheckTr.start = npc:WorldSpaceCenter()
+                waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
+                waterCheckTr.filter = npc
+                waterCheckTr.collisiongroup = npc:GetCollisionGroup()
+
+                isPurelyPanic = ( band( PointContents( TraceLine( waterCheckTr ).HitPos ), CONTENTS_WATER ) != 0 )
+            end
+        end
+
+        if !isPurelyPanic and npc:GetMoveType() == MOVETYPE_VPHYSICS then
+            local phys = npc:GetPhysicsObject()
+            if IsValid( phys ) and phys:GetVelocity():Length() >= 750 and IsValidProp( npc:GetModel() ) then
+                isPurelyPanic = true
+                stopSpeech = true
+            end
+        end
+    end
+
+    if isPurelyPanic then
+        if !NPCVC:IsCurrentlySpeaking( npc, "panic", "death" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
+            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
+            if rolledSpeech then NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) ) end
+        end
+
+        if barnacled and !NPCVC.HLS_NPCs[ npcClass ] then
+            SimpleTimer( 0.1, function()
+                if !IsValid( npc ) then return end
+
+                local npcMdl = npc:GetModel()
+                local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
+                if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
+                    for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
+                        if !IsValid( barn ) or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
+
+                        local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
+                        if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
+
+                        sndEmitter:SetSoundSource( ragdoll )
+                        break
+                    end
+                end
+            end )
+        end               
+    else
+        if stopSpeech and npc.NPCVC_InPanicState then
+            NPCVC:StopCurrentSpeech( npc, "panic" )
+
+            if IsValid( curEnemy ) and vcAllowLines_CombatIdle:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "taunt" )
+            elseif vcAllowLines_Idle:GetBool() then
+                NPCVC:PlayVoiceLine( npc, "witness" )
+            end
+        end
+
+        local lowHP = npc.NPCVC_IsLowHealth
+        if lowHP and npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
+            lowHP = false
+            npc.NPCVC_IsLowHealth = lowHP
+        end
+
+        local isPanicking = false
+        local combatLine = "taunt" 
+        
+        if IsValid( curEnemy ) then
+            isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
+            if !isPanicking and !npc.IsVJBaseSNPC and isNPC then
+                isPanicking = ( IsValid( curEnemy ) and ( NPCVC.NoWeaponNoFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !NPCVC.DontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
+            end
+            if !isPanicking then
+                isPanicking = ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) )
+            end
+
+            if curEnemy == lastEnemy and ( ( curTime - lastSeenTime ) >= 30 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
+                combatLine = "idle"
+            elseif isPanicking or lowHP and random( 1, ( 8 * ( ( npc:Health() / npc:GetMaxHealth() ) / lowHP ) ) ) == 1 then
+                if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 250000 or npc:Visible( curEnemy ) then
+                    combatLine = "panic"
+                else 
+                    combatLine = "idle"
+                end
+            end
+        end
+
+        local isNearDanger = ( isNPC and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) )
+        if !isNearDanger and vcUseSoundHintsForDangers:GetBool() then
+            local npcPos = npc:GetPos()
+            local hintDang = ( GetLoudestSoundHint( SOUND_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_PHYSICS_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_CONTEXT_DANGER_APPROACH, npcPos ) )
+
+            if hintDang then
+                local hintOwner = hintDang.owner
+                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or IsValid( hintOwner ) and hintOwner != npc and hintOwner:GetOwner() != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
+            end
+        end
+
+        if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
+            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
+            if rolledSpeech then NPCVC:PlayVoiceLine( npc, "panic" ) end
+        elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !NPCVC.HLS_NPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !NPCVC.NoStateUsingNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
+            local curState = npc:GetNPCState()
+
+            if rolledSpeech then
+                if curState != npc.NPCVC_LastState then
+                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
+                        NPCVC:PlayVoiceLine( npc, combatLine )
+                    end
+                elseif canIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
+                    if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
+                        if vcAllowLines_CombatIdle:GetBool() then
+                            NPCVC:PlayVoiceLine( npc, combatLine )
+                        end
+                    elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT or curState == NPC_STATE_SCRIPT ) and vcAllowLines_Idle:GetBool() then
+                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
+                    end
+                end
+            end
+
+            npc.NPCVC_LastState = curState
+        else
+            if npc.IsDrGNextbot and npc:IsDown() then 
+                if npc.NPCVC_LastState != 1 then
+                    OnNPCKilled( npc )
+                    npc.NPCVC_LastState = 1
+                end
+            elseif npc.NPCVC_LastState == 1 then
+                npc.NPCVC_LastState = -1
+                if rolledSpeech and IsValid( curEnemy ) then NPCVC:PlayVoiceLine( npc, "taunt" ) end
+            end
+
+            if rolledSpeech then
+                if curEnemy != lastEnemy then
+                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
+                        NPCVC:PlayVoiceLine( npc, combatLine )
+                    end
+                elseif canIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
+                    if IsValid( curEnemy ) then
+                        if vcAllowLines_CombatIdle:GetBool() then
+                            NPCVC:PlayVoiceLine( npc, combatLine )
+                        end
+                    elseif vcAllowLines_Idle:GetBool() then
+                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
+                    end
+                end
+            end
+        end
+    end
+
+    npc.NPCVC_InPanicState = isPurelyPanic
+end
+
 local function OnServerThink()
     local curTime = CurTime()
     if curTime < nextNPCSoundThink then return end
@@ -943,357 +1340,7 @@ local function OnServerThink()
 
     for _, npc in ipairs( ents_GetAll() ) do
         if !IsValid( npc ) or !npc.NPCVC_Initialized or npc.l_TranqGun_IsTranquilized then continue end
-
-        if npc.IsDoomNPC then 
-            if npc:Health() <= 0 then 
-                if !npc.NPCVC_IsKilled then OnNPCKilled( npc, nil, nil ) end
-                continue
-            elseif npc.NPCVC_IsKilled then
-                npc.NPCVC_IsKilled = false
-            end
-        end
-
-        local npcClass = npc:GetClass()
-        if npcClass == "monster_leech" and npc:GetInternalVariable( "m_takedamage" ) == 0 then
-            continue
-        end
-
-        if npcClass == "npc_turret_floor" then 
-            local selfDestructing = npc:GetInternalVariable( "m_bSelfDestructing" )
-            if !selfDestructing then 
-                local curState = npc:GetNPCState()
-                local lastState = npc.NPCVC_LastState
-                if curState != lastState then
-                    if lastState == NPC_STATE_DEAD and npc:IsPlayerHolding() and vcAllowLines_Assist:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "assist" )
-                    elseif curState == NPC_STATE_DEAD and vcAllowLines_SpotDanger:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "panic" )
-                    elseif curState == NPC_STATE_COMBAT and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "taunt" ) then
-                        NPCVC:PlayVoiceLine( npc, "taunt" )
-                    end
-                end
-                npc.NPCVC_LastState = curState
-
-                local curEnemy = npc:GetEnemy()
-                local lastEnemy = npc.NPCVC_LastEnemy
-                if curEnemy != lastEnemy and IsValid( curEnemy ) and vcAllowLines_SpotEnemy:GetBool() then
-                    NPCVC:PlayVoiceLine( npc, "taunt" )
-                end
-                npc.NPCVC_LastEnemy = curEnemy
-            elseif !npc.NPCVC_InPanicState then
-                npc.NPCVC_InPanicState = true
-
-                if vcAllowLines_PanicCond:GetBool() then
-                    SimpleTimer( Rand( 0.8, 1.25 ), function()
-                        if !IsValid( npc ) then return end
-                        NPCVC:PlayVoiceLine( npc, "panic" )
-                    end )
-
-                    SimpleTimer( Rand( 2, 3.5 ), function()
-                        if !IsValid( npc ) then return end
-                        OnNPCKilled( npc )
-                    end )
-                end
-            end
-        elseif npcClass == "npc_rollermine" and IsValid( npc:GetInternalVariable( "m_hVehicleStuckTo" ) ) and vcAllowLines_CombatIdle:GetBool() then
-            if curTime >= npc.NPCVC_NextIdleSpeak then 
-                if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
-                    NPCVC:PlayVoiceLine( npc, "taunt" )
-                end
-            end
-        elseif npcClass == "combine_mine" and npc:GetInternalVariable( "m_iMineState" ) == 4 and vcAllowLines_CombatIdle:GetBool() then
-            if random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
-                NPCVC:PlayVoiceLine( npc, "taunt" )
-            end
-        elseif npcClass == "rpg_missile" or npcClass == "grenade_ar2" or npcClass == "crossbow_bolt" or npcClass == "hunter_flechette" or npcClass == "npc_grenade_bugbait" then 
-            if npc:GetMoveType() == MOVETYPE_NONE then
-                if !npc.NPCVC_IsKilled then
-                    OnNPCKilled( npc, nil, nil )
-                end
-            elseif vcAllowLines_PanicCond:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) then
-                NPCVC:PlayVoiceLine( npc, "panic" )
-            end
-        elseif npcClass == "prop_combine_ball" then
-            if npc:GetMoveType() == MOVETYPE_NONE then
-                if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
-                    OnNPCKilled( npc, nil, nil )
-                end
-            else
-                local bounceCount = npc:GetInternalVariable( "m_nBounceCount" )
-                local lastCount = npc.NPCVC_LastState
-                if bounceCount != lastCount and lastCount != -1 and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and vcAllowLines_PanicCond:GetBool() then
-                    NPCVC:PlayVoiceLine( npc, "panic" )
-                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) and random( 1, 100 ) <= npc.NPCVC_SpeechChance and vcAllowLines_Idle:GetBool() then
-                    NPCVC:PlayVoiceLine( npc, "idle" )
-                end
-                npc.NPCVC_LastState = bounceCount
-            end
-        elseif npcClass == "npc_antlion_grub" then
-            local curState = npc:GetInternalVariable( "m_State" )
-
-            if npc:GetInternalVariable( "m_takedamage" ) == 0 then
-                if !npc.NPCVC_IsKilled then
-                    OnNPCKilled( npc, nil, nil )
-                end
-            else
-                local curState = npc:GetInternalVariable( "m_State" )
-                if random( 1, 100 ) <= npc.NPCVC_SpeechChance and random( 1, 3 ) == 1 then
-                    if curState == 1 and curState != npc.NPCVC_LastState then
-                        NPCVC:PlayVoiceLine( npc, "taunt" )
-                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
-                        NPCVC:PlayVoiceLine( npc, ( curState == 1 and "taunt" or "idle" ) )
-                    end
-                end
-
-                npc.NPCVC_LastState = curState
-            end
-        elseif npcClass == "npc_combine_camera" then
-            if npc:GetInternalVariable( "m_takedamage" ) == 2 then
-                local lookTarget = npc:GetInternalVariable( "m_hEnemyTarget" )
-                local lastTarget = npc.NPCVC_LastEnemy
-                local isAngry = npc:GetInternalVariable( "m_bAngry" )
-
-                if lookTarget != lastTarget and IsValid( lookTarget ) or isAngry and isAngry != npc.NPCVC_LastState then 
-                    if isAngry and vcAllowLines_CombatIdle:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "taunt" )
-                    elseif vcAllowLines_Idle:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "idle" )
-                    end
-                end
-
-                if npc:GetInternalVariable( "m_bActive" ) and IsValid( lookTarget ) and curTime >= npc.NPCVC_NextIdleSpeak and random( 1, 100 ) <= npc.NPCVC_SpeechChance and !NPCVC:IsCurrentlySpeaking( npc ) then
-                    if IsValid( lookTarget ) and isAngry and vcAllowLines_CombatIdle:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "taunt" )
-                    elseif vcAllowLines_Idle:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "idle" )
-                    end
-                end
-
-                npc.NPCVC_LastEnemy = lookTarget
-                npc.NPCVC_LastState = isAngry
-            elseif npc.NPCVC_LastState != -1 then
-                npc.NPCVC_LastState = -1
-                if vcAllowLines_Death:GetBool() then
-                    NPCVC:PlayVoiceLine( npc, "death" )
-                end
-            end
-        else
-            local curEnemy = NPCVC:GetEnemyOfNPC( npc )
-            local rolledSpeech = ( random( 1, 100 ) <= npc.NPCVC_SpeechChance )
-
-            if npc.LastPathingInfraction then
-                local isVisible, lastSeenTime = false, npc.NPCVC_LastSeenEnemyTime
-                if !IsValid( curEnemy ) then
-                    npc.NPCVC_LastSeenEnemyTime = 0
-                elseif npc:GetRangeSquaredTo( curEnemy ) <= 1000000 and npc:Visible( curEnemy ) then
-                    isVisible = true
-                    npc.NPCVC_LastSeenEnemyTime = curTime
-                end
-
-                if rolledSpeech then
-                    if lastSeenTime == 0 and isVisible and vcAllowLines_SpotEnemy:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "taunt" )
-                    elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
-                        if ( curTime - npc.NPCVC_LastSeenEnemyTime ) <= 5 and IsValid( curEnemy ) then
-                            if vcAllowLines_CombatIdle:GetBool() then
-                                NPCVC:PlayVoiceLine( npc, "taunt" )
-                            end
-                        elseif vcAllowLines_Idle:GetBool() then
-                            NPCVC:PlayVoiceLine( npc, "idle" )
-                        end
-                    end
-                end
-            else
-                local lifeState = npc:GetInternalVariable( "m_lifeState" )
-                if lifeState != 0 and ( npcClass == "npc_combinegunship" or npcClass == "npc_helicopter" ) then
-                    if !NPCVC:IsCurrentlySpeaking( npc, "death" ) and vcAllowLines_Death:GetBool() then
-                        NPCVC:PlayVoiceLine( npc, "death", true )
-                    end
-                elseif lifeState == 0 then 
-                    local isNPC = npc:IsNPC()
-                    local barnacled = ( npc:IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) or isNPC and npc:GetNPCState() == NPC_STATE_PRONE )
-                    local isPurelyPanic = vcAllowLines_PanicCond:GetBool()
-                    local stopSpeech = ( rolledSpeech == true )
-
-                    if isPurelyPanic then
-                        isPurelyPanic = ( barnacled or npc:IsOnFire() or npc:IsPlayerHolding() and !npc:GetInternalVariable( "m_bHackedByAlyx" ) or isNPC and ( npc:GetInternalVariable( "m_nFlyMode" ) == 6 ) )
-
-                        if !isPurelyPanic and isNPC then
-                            local curSched = ( npc:GetCurrentSchedule() + 1000000000 )
-                            isPurelyPanic = ( curSched == GetScheduleID( "SCHED_ANTLION_FLIP" ) or curSched == GetScheduleID( "SCHED_COMBINE_BUGBAIT_DISTRACTION" ) )
-
-                            if !isPurelyPanic then 
-                                local engineStallT = npc:GetInternalVariable( "m_flEngineStallTime" )
-                                isPurelyPanic = ( engineStallT and engineStallT > 0.5 ) 
-                            end
-
-                            if !isPurelyPanic and NPCVC.DrownableNPCs[ npcClass ] then
-                                waterCheckTr.start = npc:WorldSpaceCenter()
-                                waterCheckTr.endpos = ( waterCheckTr.start + npc:GetVelocity() )
-                                waterCheckTr.filter = npc
-                                waterCheckTr.collisiongroup = npc:GetCollisionGroup()
-
-                                isPurelyPanic = ( band( PointContents( TraceLine( waterCheckTr ).HitPos ), CONTENTS_WATER ) != 0 )
-                            end
-                        end
-
-                        if !isPurelyPanic and npc:GetMoveType() == MOVETYPE_VPHYSICS then
-                            local phys = npc:GetPhysicsObject()
-                            if IsValid( phys ) and phys:GetVelocity():Length() >= 750 and IsValidProp( npc:GetModel() ) then
-                                isPurelyPanic = true
-                                stopSpeech = true
-                            end
-                        end
-                    end
-
-                    if isPurelyPanic then
-                        if !NPCVC:IsCurrentlySpeaking( npc, "panic", "death" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
-                            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
-                            if rolledSpeech then NPCVC:PlayVoiceLine( npc, ( random( 10 ) == 1 and "death" or "panic" ) ) end
-                        end
-
-                        if barnacled and !NPCVC.HLS_NPCs[ npcClass ] then
-                            SimpleTimer( 0.1, function()
-                                if !IsValid( npc ) then return end
-
-                                local npcMdl = npc:GetModel()
-                                local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
-                                if IsValid( sndEmitter ) and sndEmitter:GetSoundSource() == npc then
-                                    for _, barn in ipairs( FindByClass( "npc_barnacle" ) ) do
-                                        if !IsValid( barn ) or barn:GetInternalVariable( "m_lifeState" ) != 0 or barn:GetEnemy() != npc then continue end
-
-                                        local ragdoll = barn:GetInternalVariable( "m_hRagdoll" )
-                                        if !IsValid( ragdoll ) or ragdoll:GetModel() != npcMdl then continue end
-
-                                        sndEmitter:SetSoundSource( ragdoll )
-                                        break
-                                    end
-                                end
-                            end )
-                        end               
-                    else
-                        if stopSpeech and npc.NPCVC_InPanicState then
-                            NPCVC:StopCurrentSpeech( npc, "panic" )
-
-                            if IsValid( curEnemy ) and vcAllowLines_CombatIdle:GetBool() then
-                                NPCVC:PlayVoiceLine( npc, "taunt" )
-                            elseif vcAllowLines_Idle:GetBool() then
-                                NPCVC:PlayVoiceLine( npc, "witness" )
-                            end
-                        end
-
-                        local lowHP = npc.NPCVC_IsLowHealth
-                        if lowHP and npc:Health() > ( npc:GetMaxHealth() * lowHP ) then
-                            lowHP = false
-                            npc.NPCVC_IsLowHealth = lowHP
-                        end
-
-                        local lastEnemy = npc.NPCVC_LastEnemy
-                        local isPanicking = false
-                        local combatLine = "taunt" 
-                        
-                        if IsValid( curEnemy ) then
-                            isPanicking = ( curEnemy.LastPathingInfraction and !npc:IsNextBot() )
-                            if !isPanicking and !npc.IsVJBaseSNPC and isNPC then
-                                isPanicking = ( IsValid( curEnemy ) and ( NPCVC.NoWeaponNoFearNPCs[ npcClass ] and !IsValid( npc:GetActiveWeapon() ) or NPCVC:GetDispositionOfNPC( npc, curEnemy ) == D_FR and ( !NPCVC.DontFearNPCs[ curEnemy:GetClass() ] or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 200 ) ) )
-                            end
-                            if !isPanicking then
-                                isPanicking = ( npc.NoWeapon_UseScaredBehavior and !IsValid( npc:GetActiveWeapon() ) )
-                            end
-
-                            if curEnemy == lastEnemy and ( ( curTime - npc.NPCVC_LastSeenEnemyTime ) >= 30 or npc:GetPos():DistToSqr( curEnemy:GetPos() ) > 2250000 ) then
-                                combatLine = "idle"
-                            elseif isPanicking or lowHP and random( 1, ( 8 * ( ( npc:Health() / npc:GetMaxHealth() ) / lowHP ) ) ) == 1 then
-                                if curEnemy.LastPathingInfraction or npc:GetPos():DistToSqr( curEnemy:GetPos() ) <= 250000 or npc:Visible( curEnemy ) then
-                                    combatLine = "panic"
-                                else 
-                                    combatLine = "idle"
-                                end
-                            end
-                        end
-
-                        local isNearDanger = ( isNPC and ( npc:HasCondition( 50 ) or npc:HasCondition( 57 ) ) )
-                        if !isNearDanger and vcUseSoundHintsForDangers:GetBool() then
-                            local npcPos = npc:GetPos()
-                            local hintDang = ( GetLoudestSoundHint( SOUND_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_PHYSICS_DANGER, npcPos ) or GetLoudestSoundHint( SOUND_CONTEXT_DANGER_APPROACH, npcPos ) )
-
-                            if hintDang then
-                                local hintOwner = hintDang.owner
-                                isNearDanger = ( hintDang.volume > ( npc:GetMaxHealth() * 1.5 ) and ( !IsValid( hintOwner ) and npc:VisibleVec( hintDang.origin ) or IsValid( hintOwner ) and hintOwner != npc and hintOwner:GetOwner() != npc and hintOwner:GetClass() != npcClass and npc:Visible( hintOwner ) ) )
-                            end
-                        end
-
-                        if isNearDanger and vcAllowLines_SpotDanger:GetBool() and !NPCVC:IsCurrentlySpeaking( npc, "panic" ) and CurTime() >= npc.NPCVC_NextPanicCheck then
-                            npc.NPCVC_NextPanicCheck = ( CurTime() + 5 )
-                            if rolledSpeech then NPCVC:PlayVoiceLine( npc, "panic" ) end
-                        elseif isNPC and !npc.IsVJBaseSNPC and !npc.IsDoomNPC and !NPCVC.HLS_NPCs[ npcClass ] and npcClass != "npc_barnacle" and npcClass != "reckless_kleiner" and ( !NPCVC.NoStateUsingNPCs[ npcClass ] or npcClass == "npc_turret_ceiling" and !npc:GetInternalVariable( "m_bActive" ) ) then
-                            local curState = npc:GetNPCState()
-
-                            if rolledSpeech then
-                                if curState != npc.NPCVC_LastState then
-                                    if curState == NPC_STATE_COMBAT and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
-                                        NPCVC:PlayVoiceLine( npc, combatLine )
-                                    end
-                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
-                                    if curState == NPC_STATE_COMBAT and IsValid( curEnemy ) then
-                                        if vcAllowLines_CombatIdle:GetBool() then
-                                            NPCVC:PlayVoiceLine( npc, combatLine )
-                                        end
-                                    elseif ( curState == NPC_STATE_IDLE or curState == NPC_STATE_ALERT or curState == NPC_STATE_SCRIPT ) and vcAllowLines_Idle:GetBool() then
-                                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
-                                    end
-                                end
-                            end
-
-                            npc.NPCVC_LastState = curState
-                        else
-                            if npc.IsDrGNextbot and npc:IsDown() then 
-                                if npc.NPCVC_LastState != 1 then
-                                    OnNPCKilled( npc )
-                                    npc.NPCVC_LastState = 1
-                                end
-                            elseif npc.NPCVC_LastState == 1 then
-                                npc.NPCVC_LastState = -1
-                                if rolledSpeech and IsValid( curEnemy ) then NPCVC:PlayVoiceLine( npc, "taunt" ) end
-                            end
-
-                            if rolledSpeech then
-                                if curEnemy != lastEnemy then
-                                    if IsValid( curEnemy ) and !IsValid( lastEnemy ) and vcAllowLines_SpotEnemy:GetBool() and !NPCVC:IsCurrentlySpeaking( npc ) then
-                                        NPCVC:PlayVoiceLine( npc, combatLine )
-                                    end
-                                elseif curTime >= npc.NPCVC_NextIdleSpeak and !NPCVC:IsCurrentlySpeaking( npc ) then
-                                    if IsValid( curEnemy ) then
-                                        if vcAllowLines_CombatIdle:GetBool() then
-                                            NPCVC:PlayVoiceLine( npc, combatLine )
-                                        end
-                                    elseif vcAllowLines_Idle:GetBool() then
-                                        NPCVC:PlayVoiceLine( npc, npc.NPCVC_IdleVoiceType )
-                                    end
-                                end
-                            end
-                        end
-                    end
-
-                    npc.NPCVC_InPanicState = isPurelyPanic
-                end
-            end
-
-            npc.NPCVC_LastEnemy = curEnemy
-            if IsValid( curEnemy ) then 
-                npc.NPCVC_LastValidEnemy = curEnemy
-                
-                if npc.NPCVC_LastSeenEnemyTime == 0 or npc:Visible( curEnemy ) then 
-                    npc.NPCVC_LastSeenEnemyTime = curTime 
-                end
-            else
-                npc.NPCVC_LastSeenEnemyTime = 0
-            end
-        end
-
-        if curTime >= npc.NPCVC_NextIdleSpeak then
-            npc.NPCVC_NextIdleSpeak = ( curTime + random( 0, 15 ) )
-        end
+        OnNPCThink( npc, curTime )
     end
 end
 
@@ -1384,6 +1431,7 @@ local function OnServerShutDown()
         file_Write( "npcvoicechat/mapsavednpcs.json", TableToJSON( NPCVC.MapTransitionNPCs ) )
     end
 
+    /*
     local lineTbl = {}
     local osTime, realT = os_time(), CurTime()
     for snd, time in pairs( NPCVC.LastUsedLines ) do
@@ -1391,13 +1439,14 @@ local function OnServerShutDown()
         lineTbl[ snd ] = ( osTime + ( time - realT ) )
     end
     file_Write( "npcvoicechat/lastusedlines.json", TableToJSON( lineTbl ) )
+    */
 end
 
 local function OnMapInitialized()
     UpdateData()
 
     --
-
+    /*
     local lineTbl = file_Read( "npcvoicechat/lastusedlines.json", "DATA" )
     if lineTbl then 
         local osTime = os_time()
@@ -1410,7 +1459,7 @@ local function OnMapInitialized()
             NPCVC.LastUsedLines[ snd ] = finTime
         end
     end
-
+    */
     --
 
     NPCVC.OldFunc_GetDeathNoticeEntityName = ( NPCVC.OldFunc_GetDeathNoticeEntityName or GAMEMODE.GetDeathNoticeEntityName )

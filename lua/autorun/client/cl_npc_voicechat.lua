@@ -64,7 +64,7 @@ local npcNameBgColor    = Color( 72, 72, 72 )
 local vcEnabled         = CreateConVar( "sv_npcvoicechat_enabled", "1", ( FCVAR_ARCHIVE + FCVAR_REPLICATED ), "Allows to NPCs and nextbots to able to speak voicechat-like using voicelines", 0, 1 )
 local vcGlobalVC        = CreateClientConVar( "cl_npcvoicechat_globalvoicechat", "0", nil, nil, "If the NPC voices can be heard globally", 0, 1 )
 local vcPlayVol         = CreateClientConVar( "cl_npcvoicechat_playvolume", "1", nil, nil, "The sound volume of NPC voices", 0 )
-local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "300", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
+local vcPlayDist        = CreateClientConVar( "cl_npcvoicechat_playdistance", "400", nil, nil, "Controls how far the NPC voices can be clearly heard from. Requires global voicechat to be disabled", 0 )
 local vcShowIcon        = CreateClientConVar( "cl_npcvoicechat_showvoiceicon", "1", nil, nil, "If a voice icon should appear above NPC while they're speaking?", 0, 1 )
 local vcScaleIcon       = CreateClientConVar( "cl_npcvoicechat_scaleicon", "1", nil, nil, "If voice icons should scale with their owner's sizes", 0, 1 )
 local vcShowPopups      = CreateClientConVar( "cl_npcvoicechat_showpopups", "1", nil, nil, "Allows to draw and display a voicechat popup when NPCs are currently speaking", 0, 1 )
@@ -131,6 +131,17 @@ local function GetSoundSource( ent )
     end
     return srcEnt, netFunc
 end
+
+-- local host_timescale = GetConVar( "host_timescale" )
+-- local sv_cheats = GetConVar( "sv_cheats" )
+
+-- local function GetTimeScale()
+--     local baseTS = game.GetTimeScale()
+--     if sv_cheats:GetBool() then
+--         baseTS = baseTS * host_timescale:GetFloat()
+--     end
+--     return baseTS
+-- end
 
 local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
     local ent = vcData.Emitter
@@ -201,6 +212,7 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             PlayOrigin = playOrigin,
             LastPlayPos = playPos,
             VolumeMult = volMult,
+            -- VoicePitch = vcData.Pitch,
             Is3D = is3D,
             IconHeight = vcData.IconHeight,
             PlayTime = playTime,
@@ -380,6 +392,9 @@ local function UpdateSounds()
                     end
                 end
             end
+            
+            -- local playRate = ( sndData.VoicePitch / 100 )
+            -- snd:SetPlaybackRate( playRate * GetTimeScale() )
 
             if isGlobal then
                 snd:SetVolume( volume )
