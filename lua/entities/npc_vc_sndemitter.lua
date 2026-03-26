@@ -23,7 +23,6 @@ if ( SERVER ) then
 
     local IsValid = IsValid
     local CurTime = CurTime
-    local RealTime = RealTime
     local max = math.max
 
     function ENT:Initialize()
@@ -32,7 +31,7 @@ if ( SERVER ) then
         self:SetNotSolid( false )
         self:SetMoveType( MOVETYPE_FLYGRAVITY )
 
-        self.SpeechPlayTime = ( RealTime() + 5 )
+        self.SpeechPlayTime = ( NPCVC:GetTimeSys() + 5 )
         NPCVC.TalkingNPCs[ self ] = true
 
         local owner = self:GetOwner()
@@ -51,7 +50,7 @@ if ( SERVER ) then
     end
 
     function ENT:Think()
-        if RealTime() > self.SpeechPlayTime then self:Remove() return end
+        if NPCVC:GetTimeSys() > self.SpeechPlayTime then self:Remove() return end
 
         local srcEnt = self:GetSoundSource()
         if IsValid( srcEnt ) then 

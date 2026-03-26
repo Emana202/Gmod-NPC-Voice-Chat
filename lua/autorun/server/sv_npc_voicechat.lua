@@ -83,7 +83,7 @@ NPCVC.NPCWhitelist      = NPCVC.NPCWhitelist or {}
 NPCVC.TalkingNPCs       = NPCVC.TalkingNPCs or {}
 NPCVC.MapTransitionNPCs = NPCVC.MapTransitionNPCs or nil
 NPCVC.CachedNPCPfps     = {}
--- NPCVC.LastUsedLines     = NPCVC.LastUsedLines or {}
+NPCVC.LastUsedLines     = NPCVC.LastUsedLines or {}
 
 file.CreateDir( "npcvoicechat" )
 
@@ -255,7 +255,15 @@ concommand.Add( "sv_npcvoicechat_updatedata", UpdateData, nil, "Updates and refr
 
 net.Receive( "npcsqueakers_sndduration", function()
     local ent = net.ReadEntity()
-    if IsValid( ent ) then ent.SpeechPlayTime = ( RealTime() + net.ReadFloat() ) end
+    if !IsValid( ent ) then return end    
+
+    local playTime = ( NPCVC:GetTimeSys() + net.ReadFloat() )
+    ent.SpeechPlayTime = playTime
+
+    local voiceFile = net.ReadString()
+    if NPCVC.LastUsedLines[ voiceFile ] then
+        NPCVC.LastUsedLines[ voiceFile ] = playTime
+    end
 end )
 
 net.Receive( "npcsqueakers_resetsettings", function()
@@ -330,7 +338,7 @@ local function GetVoiceLine( ent, voiceType )
     end
     if !voiceTbl or #voiceTbl == 0 then return end
 
-    local realTime = CurTime()
+    local realTime = NPCVC:GetTimeSys()
     callCount = ( callCount + 1 )
     randomseed( ent:EntIndex() + ent:GetCreationID() + os_time() + realTime + callCount )
 
@@ -344,18 +352,21 @@ local function GetVoiceLine( ent, voiceType )
             continue
         end
         
-        /*
         local useTime = NPCVC.LastUsedLines[ voiceFile ]
         if useTime then
             if realTime < useTime then continue end
             NPCVC.LastUsedLines[ voiceFile ] = nil
         else
-            NPCVC.LastUsedLines[ voiceFile ] = ( realTime + 1800 )
+            NPCVC.LastUsedLines[ voiceFile ] = ( realTime + 5 )
         end
-        */
+
         return voiceLine
     end
     return voiceTbl[ random( #voiceTbl ) ]
+end
+
+function NPCVC:GetTimeSys()
+    return ( IsSinglePlayer() and CurTime() or RealTime() )
 end
 
 local ignoreGagTypes = {
@@ -480,7 +491,7 @@ function NPCVC:IsCurrentlySpeaking( npc, ... )
         if !isSpeaking then return false end
     end
     local sndEmitter = npc:GetNW2Entity( "npcsqueakers_sndemitter" )
-    return ( IsValid( sndEmitter ) and RealTime() <= sndEmitter.SpeechPlayTime )
+    return ( IsValid( sndEmitter ) and NPCVC:GetTimeSys() <= sndEmitter.SpeechPlayTime )
 end
 
 local function GetAvailableNickname()

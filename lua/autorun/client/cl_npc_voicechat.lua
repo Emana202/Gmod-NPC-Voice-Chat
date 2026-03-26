@@ -10,6 +10,7 @@ local abs = math.abs
 local string_sub = string.sub
 local string_find = string.find
 local lower = string.lower
+local string_Explode = string.Explode
 local Clamp = math.Clamp
 local table_Empty = table.Empty
 local RealTime = RealTime
@@ -51,6 +52,9 @@ local notification_AddLegacy = notification.AddLegacy
 local vgui_Create = vgui.Create
 local list_Get = list.Get
 local isentity = isentity
+local IsSinglePlayer = game.SinglePlayer
+local IsGameUiVisible = gui.IsGameUIVisible
+local IsConsoleVisible = gui.IsConsoleVisible
 
 local lambdaPopupX, lambdaPopupY
 
@@ -216,7 +220,8 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             Is3D = is3D,
             IconHeight = vcData.IconHeight,
             PlayTime = playTime,
-            IsDormant = vcData.IsDormant
+            IsDormant = vcData.IsDormant,
+            IsPaused = false
         }
 
         local entIndex = vcData.EntIndex
@@ -279,9 +284,15 @@ local function PlaySoundFile( sndDir, vcData, playDelay, is3D )
             }
         end
 
+        
         net.Start( "npcsqueakers_sndduration" )
             net.WriteEntity( ent )
             net.WriteFloat( ( sndLength / playRate ) + playDelay )
+
+            local voiceFile = string_Explode( "/", sndDir, false )
+            if voiceFile or #voiceFile != 0 then 
+                net.WriteString( voiceFile[ #voiceFile ] )
+            end
         net.SendToServer()
     end
     PlayFile( sndName, sndFlags, SoundCallback )
@@ -363,9 +374,20 @@ local function UpdateSounds()
             continue
         end
 
-        if playTime and realTime >= sndData.PlayTime then
+        local isGamePaused = ( IsSinglePlayer() and ( IsGameUiVisible() or IsConsoleVisible() ) )
+        if playTime then
+            if !isGamePaused and realTime >= sndData.PlayTime then
+                snd:Play()
+                sndData.PlayTime = false
+            end
+        elseif isGamePaused then
+            if !playTime and !sndData.IsPaused then
+                snd:Pause()
+                sndData.IsPaused = true
+            end
+        elseif sndData.IsPaused then
             snd:Play()
-            sndData.PlayTime = false
+            sndData.IsPaused = false
         end
 
         if enabled then
@@ -407,7 +429,9 @@ local function UpdateSounds()
                 if is3D then
                     snd:Set3DEnabled( true )
                     snd:SetPos( lastPos )
-                    snd:Set3DFadeDistance( ( fadeDist * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ) ), 0 )
+
+                    local minFadeDist = ( fadeDist * max( volMult * 0.66, ( volMult >= 2.0 and 1.5 or 1 ) ) )
+                    snd:Set3DFadeDistance( minFadeDist, 0 )
                 else
                     snd:Set3DEnabled( false )
                     sndVol = Clamp( sndVol - ( curPos:Distance( lastPos ) / ( fadeDist * 1.5 ) ), 0, 1 )
