@@ -1533,6 +1533,7 @@ local function PopulateToolMenu()
 
         AddSettingsPanel( panel, false, "CheckBox", "Disable Offensive Lines", "sv_npcvoicechat_censorcertainlines", "If enabled, disables certain offensive voicelines from playing" )
         AddSettingsPanel( panel, false, "CheckBox", "Ignore Gagged NPCs", "sv_npcvoicechat_ignoregaggednpcs", "If NPCs that are gagged by a spawnflag aren't allowed to speak until its removed" )
+        AddSettingsPanel( panel, false, "CheckBox", "Whitelist Only NPCs", "sv_npcvoicechat_whitelistonly", "If only the NPCs assigned in the whitelist should have the right to use the voicechat" )
         AddSettingsPanel( panel, false, "CheckBox", "Slightly Delay Playing", "sv_npcvoicechat_slightdelay", "If there should be a slight delay before NPC plays its voiceline to simulate its reaction time" )
         AddSettingsPanel( panel, false, "CheckBox", "Use Actual Names", "sv_npcvoicechat_userealnames", "If NPCs should use their actual names instead of picking random nicknames")
         AddSettingsPanel( panel, false, "CheckBox", "Use Nicknames On Killfeed", "sv_npcvoicechat_killfeednicks", "If NPC's killfeed name should be their nickname instead")

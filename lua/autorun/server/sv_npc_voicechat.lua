@@ -96,6 +96,7 @@ local vcAllowSanics             = CreateConVar( "sv_npcvoicechat_allowsanic", "1
 local vcAllowSBNextbots         = CreateConVar( "sv_npcvoicechat_allowsbnextbots", "1", cvarFlag, "If SB Advanced Nextbots like the Terminator are allowed to use voicechat", 0, 1 )
 local vcAllowTF2Bots            = CreateConVar( "sv_npcvoicechat_allowtf2bots", "1", cvarFlag, "If bots from Team Fortress 2 are allowed to use voicechat", 0, 1 )
 local vcAllowGMDoom             = CreateConVar( "sv_npcvoicechat_allowgmdoom", "1", cvarFlag, "If NPCs from the GMDoom addon are allowed to use voicechat", 0, 1 )
+local vcWhiteListOnly           = CreateConVar( "sv_npcvoicechat_whitelistonly", "0", cvarFlag, "If only the NPCs assigned in the whitelist should have the right to use the voicechat", 0, 1 )
 local vcUseModelIcon            = CreateConVar( "sv_npcvoicechat_usemodelicons", "0", cvarFlag, "If NPC's profile pictures should first check for their model's spawnmenu icon to use as a one instead of the entity icon", 0, 1 )
 local vcUseCustomPfps           = CreateConVar( "sv_npcvoicechat_usecustompfps", "0", cvarFlag, "If NPCs are allowed to use custom profile pictures instead of their spawnmenu icons", 0, 1 )
 local vcUserPfpsOnly            = CreateConVar( "sv_npcvoicechat_userpfpsonly", "0", cvarFlag, "If NPCs are only allowed to use profile pictures that are placed by players", 0, 1 )
@@ -717,6 +718,7 @@ local function OnEntityCreated( npc )
             if !npc.IsGmodZombie and !npc.MNG_TF2Bot and !npc.SBAdvancedNextBot and !npc.IsDrGNextbot and !npc.IV04NextBot and !npc.LastPathingInfraction and ( !NPCVC:IsPhysicsProp( npc ) or !vcAllowProps:GetBool() ) and npcClass != "reckless_kleiner" and npcClass != "npc_antlion_grub" and ( !npc:IsNPC() or NPCVC.NonNPC_NPCs[ npcClass ] or string_find( npcClass, "bullseye" ) ) then return end
             if IsBasedOn( npcClass, "animprop_generic" ) or IsBasedOn( npcClass, "animprop_generic_physmodel" ) then return end
             if npc.Base == "npc_vj_tankg_base" then return end
+            if vcWhiteListOnly:GetBool() then return end
         end
 
         npc.NPCVC_Initialized = true
@@ -1351,6 +1353,11 @@ local function OnServerThink()
 
     for _, npc in ipairs( ents_GetAll() ) do
         if !IsValid( npc ) or !npc.NPCVC_Initialized or npc.l_TranqGun_IsTranquilized then continue end
+        
+        if npc.NPCVC_VoiceProfile then
+            debugoverlay.Text( npc:GetPos() + vector_up * 80, npc.NPCVC_VoiceProfile, 0.1, true )
+        end
+
         OnNPCThink( npc, curTime )
     end
 end
